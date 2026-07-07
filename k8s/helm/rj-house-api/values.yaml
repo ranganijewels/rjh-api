@@ -1,0 +1,58 @@
+replicaCount: 3
+
+image:
+  repository: rjhouse/api
+  pullPolicy: IfNotPresent
+  tag: "latest"
+
+service:
+  type: ClusterIP
+  port: 4000
+
+ingress:
+  enabled: true
+  host: api.rjhouse.com
+  tls: true
+  certManagerClusterIssuer: letsencrypt-prod
+
+resources:
+  requests:
+    cpu: 200m
+    memory: 256Mi
+  limits:
+    cpu: 1000m
+    memory: 1Gi
+
+autoscaling:
+  enabled: true
+  minReplicas: 3
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 70
+
+env:
+  NODE_ENV: production
+  PORT: "4000"
+
+postgresql:
+  enabled: true
+  host: postgresql
+  port: "5432"
+  database: rjhouse_db
+
+redis:
+  enabled: true
+  host: redis-master
+  port: "6379"
+
+minio:
+  enabled: true
+  endpoint: minio
+  port: "9000"
+
+rabbitmq:
+  enabled: true
+  url: amqp://rabbitmq:5672
+
+elasticsearch:
+  enabled: true
+  node: http://elasticsearch:9200

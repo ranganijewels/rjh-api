@@ -1,0 +1,90 @@
+<svg viewBox="0 0 400 400" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <radialGradient id="bgE" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#1a1020"/>
+      <stop offset="100%" stop-color="#080510"/>
+    </radialGradient>
+    <radialGradient id="goldE" cx="30%" cy="25%" r="70%">
+      <stop offset="0%" stop-color="#ffe566"/>
+      <stop offset="50%" stop-color="#c8a020"/>
+      <stop offset="100%" stop-color="#5a3800"/>
+    </radialGradient>
+    <radialGradient id="diaE" cx="30%" cy="20%" r="80%">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="30%" stop-color="#e8f4ff"/>
+      <stop offset="70%" stop-color="#90b8e0"/>
+      <stop offset="100%" stop-color="#2060a0"/>
+    </radialGradient>
+    <radialGradient id="rubyE" cx="30%" cy="25%" r="70%">
+      <stop offset="0%" stop-color="#ff8080"/>
+      <stop offset="50%" stop-color="#c01030"/>
+      <stop offset="100%" stop-color="#500010"/>
+    </radialGradient>
+    <filter id="glowE">
+      <feGaussianBlur stdDeviation="3" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <rect width="400" height="400" fill="url(#bgE)"/>
+
+  <!-- LEFT EARRING -->
+  <!-- Stud top -->
+  <circle cx="130" cy="80" r="16" fill="url(#goldE)" filter="url(#glowE)"/>
+  <circle cx="130" cy="80" r="10" fill="url(#diaE)"/>
+  <circle cx="127" cy="77" r="3" fill="white" opacity="0.8"/>
+  <!-- Connecting bar -->
+  <rect x="127" y="94" width="6" height="25" rx="2" fill="#c8a020"/>
+  <!-- Leaf top -->
+  <ellipse cx="130" cy="145" rx="24" ry="30" fill="url(#goldE)" filter="url(#glowE)"/>
+  <ellipse cx="130" cy="145" rx="16" ry="22" fill="#c8a020" opacity="0.5"/>
+  <line x1="130" y1="117" x2="130" y2="173" stroke="#ffe566" stroke-width="1.5" opacity="0.7"/>
+  <ellipse cx="122" cy="138" rx="5" ry="8" fill="url(#rubyE)" transform="rotate(-15,122,138)"/>
+  <ellipse cx="138" cy="138" rx="5" ry="8" fill="url(#rubyE)" transform="rotate(15,138,138)"/>
+  <ellipse cx="130" cy="153" rx="5" ry="8" fill="url(#rubyE)"/>
+  <!-- Drop connector -->
+  <rect x="127" y="173" width="6" height="18" rx="2" fill="#c8a020"/>
+  <!-- Diamond drop -->
+  <polygon points="130,195 152,225 130,268 108,225" fill="url(#diaE)" filter="url(#glowE)"/>
+  <polygon points="130,195 145,218 130,212 115,218" fill="white" opacity="0.6"/>
+  <polygon points="130,195 152,225 145,218" fill="#b0d0f0" opacity="0.5"/>
+  <polygon points="130,195 108,225 115,218" fill="#d0e8ff" opacity="0.5"/>
+  <polygon points="130,212 152,225 130,268 108,225 115,218 130,212 145,218 152,225" fill="#6090c0" opacity="0.4"/>
+  <circle cx="127" cy="207" r="2" fill="white" opacity="0.9"/>
+  <!-- Earring hook left -->
+  <path d="M 130 78 Q 118 68 118 55 Q 118 42 130 40 Q 142 38 142 50" fill="none" stroke="#c8a020" stroke-width="3" stroke-linecap="round"/>
+
+  <!-- RIGHT EARRING (mirrored) -->
+  <!-- Stud top -->
+  <circle cx="270" cy="80" r="16" fill="url(#goldE)" filter="url(#glowE)"/>
+  <circle cx="270" cy="80" r="10" fill="url(#diaE)"/>
+  <circle cx="267" cy="77" r="3" fill="white" opacity="0.8"/>
+  <!-- Connecting bar -->
+  <rect x="267" y="94" width="6" height="25" rx="2" fill="#c8a020"/>
+  <!-- Leaf top -->
+  <ellipse cx="270" cy="145" rx="24" ry="30" fill="url(#goldE)" filter="url(#glowE)"/>
+  <ellipse cx="270" cy="145" rx="16" ry="22" fill="#c8a020" opacity="0.5"/>
+  <line x1="270" y1="117" x2="270" y2="173" stroke="#ffe566" stroke-width="1.5" opacity="0.7"/>
+  <ellipse cx="262" cy="138" rx="5" ry="8" fill="url(#rubyE)" transform="rotate(-15,262,138)"/>
+  <ellipse cx="278" cy="138" rx="5" ry="8" fill="url(#rubyE)" transform="rotate(15,278,138)"/>
+  <ellipse cx="270" cy="153" rx="5" ry="8" fill="url(#rubyE)"/>
+  <!-- Drop connector -->
+  <rect x="267" y="173" width="6" height="18" rx="2" fill="#c8a020"/>
+  <!-- Diamond drop -->
+  <polygon points="270,195 292,225 270,268 248,225" fill="url(#diaE)" filter="url(#glowE)"/>
+  <polygon points="270,195 285,218 270,212 255,218" fill="white" opacity="0.6"/>
+  <polygon points="270,195 292,225 285,218" fill="#b0d0f0" opacity="0.5"/>
+  <polygon points="270,195 248,225 255,218" fill="#d0e8ff" opacity="0.5"/>
+  <circle cx="267" cy="207" r="2" fill="white" opacity="0.9"/>
+  <!-- Earring hook right -->
+  <path d="M 270 78 Q 258 68 258 55 Q 258 42 270 40 Q 282 38 282 50" fill="none" stroke="#c8a020" stroke-width="3" stroke-linecap="round"/>
+
+  <!-- Sparkles -->
+  <line x1="200" y1="150" x2="200" y2="138" stroke="white" stroke-width="1" opacity="0.4"/>
+  <line x1="194" y1="144" x2="206" y2="144" stroke="white" stroke-width="1" opacity="0.4"/>
+  <circle cx="65" cy="200" r="1.5" fill="#ffe566" opacity="0.5"/>
+  <circle cx="335" cy="180" r="1.5" fill="#ffe566" opacity="0.5"/>
+  <circle cx="200" cy="280" r="2" fill="white" opacity="0.3"/>
+
+  <text x="200" y="350" text-anchor="middle" font-family="Georgia, serif" font-size="16" fill="#c8a020" letter-spacing="3">RJ HOUSE</text>
+  <text x="200" y="370" text-anchor="middle" font-family="Georgia, serif" font-size="11" fill="#888" letter-spacing="1">DIAMOND DROP EARRINGS</text>
+</svg>

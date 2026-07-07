@@ -1,0 +1,84 @@
+<svg viewBox="0 0 400 400" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <radialGradient id="bgEt" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#1a1520"/>
+      <stop offset="100%" stop-color="#080510"/>
+    </radialGradient>
+    <radialGradient id="goldEt" cx="25%" cy="20%" r="80%">
+      <stop offset="0%" stop-color="#ffe566"/>
+      <stop offset="40%" stop-color="#c8a020"/>
+      <stop offset="100%" stop-color="#5a3800"/>
+    </radialGradient>
+    <radialGradient id="diaEt" cx="25%" cy="15%" r="85%">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="35%" stop-color="#e8f4ff"/>
+      <stop offset="70%" stop-color="#80b0e0"/>
+      <stop offset="100%" stop-color="#2050a0"/>
+    </radialGradient>
+    <filter id="glowEt">
+      <feGaussianBlur stdDeviation="3" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <rect width="400" height="400" fill="url(#bgEt)"/>
+
+  <!-- Ring band - thick gold ellipse -->
+  <ellipse cx="200" cy="215" rx="130" ry="50" fill="none" stroke="url(#goldEt)" stroke-width="32" filter="url(#glowEt)"/>
+  <!-- Highlight rim -->
+  <ellipse cx="200" cy="215" rx="130" ry="50" fill="none" stroke="#ffe566" stroke-width="5" opacity="0.4"/>
+
+  <!-- Row of diamonds set into band (top arc) -->
+  <!-- 7 diamonds evenly spaced on top arc -->
+  <circle cx="200" cy="165" r="11" fill="url(#diaEt)" filter="url(#glowEt)"/>
+  <circle cx="200" cy="165" r="6" fill="white" opacity="0.5"/>
+  <circle cx="197" cy="162" r="2.5" fill="white" opacity="0.9"/>
+
+  <circle cx="173" cy="170" r="10" fill="url(#diaEt)" filter="url(#glowEt)"/>
+  <circle cx="173" cy="170" r="5.5" fill="white" opacity="0.5"/>
+  <circle cx="170" cy="167" r="2" fill="white" opacity="0.9"/>
+
+  <circle cx="227" cy="170" r="10" fill="url(#diaEt)" filter="url(#glowEt)"/>
+  <circle cx="227" cy="170" r="5.5" fill="white" opacity="0.5"/>
+  <circle cx="224" cy="167" r="2" fill="white" opacity="0.9"/>
+
+  <circle cx="148" cy="182" r="9" fill="url(#diaEt)" filter="url(#glowEt)"/>
+  <circle cx="148" cy="182" r="5" fill="white" opacity="0.5"/>
+  <circle cx="145" cy="179" r="2" fill="white" opacity="0.8"/>
+
+  <circle cx="252" cy="182" r="9" fill="url(#diaEt)" filter="url(#glowEt)"/>
+  <circle cx="252" cy="182" r="5" fill="white" opacity="0.5"/>
+  <circle cx="249" cy="179" r="2" fill="white" opacity="0.8"/>
+
+  <circle cx="126" cy="200" r="8" fill="url(#diaEt)" filter="url(#glowEt)"/>
+  <circle cx="126" cy="200" r="4.5" fill="white" opacity="0.5"/>
+  <circle cx="123" cy="197" r="1.8" fill="white" opacity="0.8"/>
+
+  <circle cx="274" cy="200" r="8" fill="url(#diaEt)" filter="url(#glowEt)"/>
+  <circle cx="274" cy="200" r="4.5" fill="white" opacity="0.5"/>
+  <circle cx="271" cy="197" r="1.8" fill="white" opacity="0.8"/>
+
+  <!-- Gold prong separators between diamonds -->
+  <line x1="185" y1="166" x2="190" y2="168" stroke="#c8a020" stroke-width="3" stroke-linecap="round"/>
+  <line x1="210" y1="168" x2="215" y2="166" stroke="#c8a020" stroke-width="3" stroke-linecap="round"/>
+  <line x1="160" y1="175" x2="164" y2="178" stroke="#c8a020" stroke-width="2.5" stroke-linecap="round"/>
+  <line x1="235" y1="178" x2="239" y2="175" stroke="#c8a020" stroke-width="2.5" stroke-linecap="round"/>
+  <line x1="136" y1="189" x2="140" y2="193" stroke="#c8a020" stroke-width="2.5" stroke-linecap="round"/>
+  <line x1="260" y1="193" x2="264" y2="189" stroke="#c8a020" stroke-width="2.5" stroke-linecap="round"/>
+
+  <!-- Shadow effect at bottom -->
+  <ellipse cx="200" cy="280" rx="120" ry="16" fill="#c8a020" opacity="0.08"/>
+
+  <!-- Sparkles -->
+  <g opacity="0.8">
+    <line x1="100" y1="145" x2="100" y2="133" stroke="white" stroke-width="1.5"/>
+    <line x1="94" y1="139" x2="106" y2="139" stroke="white" stroke-width="1.5"/>
+    <line x1="300" y1="140" x2="300" y2="130" stroke="white" stroke-width="1.5"/>
+    <line x1="295" y1="135" x2="305" y2="135" stroke="white" stroke-width="1.5"/>
+  </g>
+  <circle cx="155" cy="125" r="2" fill="#ffe566" opacity="0.6"/>
+  <circle cx="248" cy="122" r="1.5" fill="white" opacity="0.6"/>
+  <circle cx="200" cy="118" r="2.5" fill="white" opacity="0.4"/>
+
+  <text x="200" y="358" text-anchor="middle" font-family="Georgia, serif" font-size="16" fill="#c8a020" letter-spacing="3">RJ HOUSE</text>
+  <text x="200" y="378" text-anchor="middle" font-family="Georgia, serif" font-size="11" fill="#888" letter-spacing="1">DIAMOND ETERNITY BAND</text>
+</svg>

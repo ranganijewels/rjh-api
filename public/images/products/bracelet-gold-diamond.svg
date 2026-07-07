@@ -1,0 +1,84 @@
+<svg viewBox="0 0 400 400" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <radialGradient id="bgB" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#101520"/>
+      <stop offset="100%" stop-color="#050810"/>
+    </radialGradient>
+    <radialGradient id="goldB" cx="30%" cy="25%" r="70%">
+      <stop offset="0%" stop-color="#ffe566"/>
+      <stop offset="50%" stop-color="#c8a020"/>
+      <stop offset="100%" stop-color="#5a3800"/>
+    </radialGradient>
+    <radialGradient id="diaB" cx="25%" cy="20%" r="80%">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="40%" stop-color="#d0e8ff"/>
+      <stop offset="100%" stop-color="#3070b0"/>
+    </radialGradient>
+    <filter id="glowB">
+      <feGaussianBlur stdDeviation="3" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <rect width="400" height="400" fill="url(#bgB)"/>
+
+  <!-- Bracelet main band - curved ellipse shape -->
+  <ellipse cx="200" cy="210" rx="155" ry="60" fill="none" stroke="url(#goldB)" stroke-width="28" filter="url(#glowB)"/>
+  <!-- Inner highlight -->
+  <ellipse cx="200" cy="210" rx="155" ry="60" fill="none" stroke="#ffe566" stroke-width="10" opacity="0.3"/>
+
+  <!-- Diamond links on bracelet - top arc -->
+  <!-- Link 1 center top -->
+  <ellipse cx="200" cy="152" rx="14" ry="10" fill="url(#diaB)" filter="url(#glowB)"/>
+  <ellipse cx="200" cy="152" rx="8" ry="6" fill="white" opacity="0.5"/>
+  <circle cx="197" cy="150" r="2.5" fill="white" opacity="0.8"/>
+
+  <!-- Link 2 left of center -->
+  <ellipse cx="160" cy="158" rx="12" ry="9" fill="url(#diaB)" filter="url(#glowB)" transform="rotate(-15,160,158)"/>
+  <ellipse cx="160" cy="158" rx="6" ry="5" fill="white" opacity="0.5" transform="rotate(-15,160,158)"/>
+  <circle cx="158" cy="156" r="2" fill="white" opacity="0.8"/>
+
+  <!-- Link 3 right of center -->
+  <ellipse cx="240" cy="158" rx="12" ry="9" fill="url(#diaB)" filter="url(#glowB)" transform="rotate(15,240,158)"/>
+  <ellipse cx="240" cy="158" rx="6" ry="5" fill="white" opacity="0.5" transform="rotate(15,240,158)"/>
+  <circle cx="238" cy="156" r="2" fill="white" opacity="0.8"/>
+
+  <!-- Link 4 far left -->
+  <ellipse cx="118" cy="175" rx="11" ry="8" fill="url(#diaB)" filter="url(#glowB)" transform="rotate(-30,118,175)"/>
+  <circle cx="116" cy="173" r="2" fill="white" opacity="0.8"/>
+
+  <!-- Link 5 far right -->
+  <ellipse cx="282" cy="175" rx="11" ry="8" fill="url(#diaB)" filter="url(#glowB)" transform="rotate(30,282,175)"/>
+  <circle cx="280" cy="173" r="2" fill="white" opacity="0.8"/>
+
+  <!-- Gold ornamental links between diamonds -->
+  <circle cx="180" cy="155" r="5" fill="#c8a020" stroke="#ffe566" stroke-width="1.5"/>
+  <circle cx="220" cy="155" r="5" fill="#c8a020" stroke="#ffe566" stroke-width="1.5"/>
+  <circle cx="139" cy="165" r="4" fill="#c8a020" stroke="#ffe566" stroke-width="1.5"/>
+  <circle cx="261" cy="165" r="4" fill="#c8a020" stroke="#ffe566" stroke-width="1.5"/>
+
+  <!-- Clasp area right side -->
+  <rect x="338" y="200" width="22" height="14" rx="5" fill="#c8a020" stroke="#ffe566" stroke-width="1.5"/>
+  <line x1="344" y1="207" x2="354" y2="207" stroke="#ffe566" stroke-width="2"/>
+  <circle cx="349" cy="207" r="3" fill="#ffe566"/>
+
+  <!-- Shadow below bracelet -->
+  <ellipse cx="200" cy="278" rx="140" ry="15" fill="#c8a020" opacity="0.08"/>
+
+  <!-- Reflective surface shimmer -->
+  <ellipse cx="200" cy="270" rx="155" ry="60" fill="none" stroke="url(#goldB)" stroke-width="5" opacity="0.2"/>
+
+  <!-- Sparkles -->
+  <g opacity="0.7">
+    <line x1="95" y1="155" x2="95" y2="143" stroke="white" stroke-width="1.5"/>
+    <line x1="89" y1="149" x2="101" y2="149" stroke="white" stroke-width="1.5"/>
+    <line x1="310" y1="148" x2="310" y2="140" stroke="white" stroke-width="1.5"/>
+    <line x1="305" y1="144" x2="315" y2="144" stroke="white" stroke-width="1.5"/>
+    <line x1="200" y1="125" x2="200" y2="118" stroke="#ffe566" stroke-width="1.5"/>
+    <line x1="195" y1="121" x2="205" y2="121" stroke="#ffe566" stroke-width="1.5"/>
+  </g>
+  <circle cx="130" cy="120" r="2" fill="white" opacity="0.5"/>
+  <circle cx="275" cy="118" r="1.5" fill="#ffe566" opacity="0.6"/>
+
+  <text x="200" y="360" text-anchor="middle" font-family="Georgia, serif" font-size="16" fill="#c8a020" letter-spacing="3">RJ HOUSE</text>
+  <text x="200" y="380" text-anchor="middle" font-family="Georgia, serif" font-size="11" fill="#888" letter-spacing="1">DIAMOND TENNIS BRACELET</text>
+</svg>

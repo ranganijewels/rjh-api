@@ -1,0 +1,84 @@
+<svg viewBox="0 0 400 400" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <radialGradient id="bgCh" cx="50%" cy="40%" r="60%">
+      <stop offset="0%" stop-color="#12100a"/>
+      <stop offset="100%" stop-color="#060504"/>
+    </radialGradient>
+    <radialGradient id="goldCh" cx="30%" cy="20%" r="75%">
+      <stop offset="0%" stop-color="#ffe566"/>
+      <stop offset="45%" stop-color="#c8a020"/>
+      <stop offset="100%" stop-color="#5a3800"/>
+    </radialGradient>
+    <radialGradient id="diaCh" cx="25%" cy="15%" r="85%">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="35%" stop-color="#e0f0ff"/>
+      <stop offset="100%" stop-color="#3060a0"/>
+    </radialGradient>
+    <filter id="glowCh">
+      <feGaussianBlur stdDeviation="3.5" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <rect width="400" height="400" fill="url(#bgCh)"/>
+
+  <!-- Choker band - wide gold arc -->
+  <path d="M 55 220 Q 60 160 200 150 Q 340 160 345 220" fill="none" stroke="url(#goldCh)" stroke-width="30" stroke-linecap="round" filter="url(#glowCh)"/>
+  <!-- Highlight line on band -->
+  <path d="M 55 220 Q 60 160 200 150 Q 340 160 345 220" fill="none" stroke="#ffe566" stroke-width="6" stroke-linecap="round" opacity="0.3"/>
+
+  <!-- Diamond cluster center pendant drop -->
+  <!-- Main diamond -->
+  <polygon points="200,183 222,210 200,248 178,210" fill="url(#diaCh)" filter="url(#glowCh)"/>
+  <polygon points="200,183 215,205 200,198 185,205" fill="white" opacity="0.6"/>
+  <polygon points="200,183 222,210 215,205" fill="#b0d0f0" opacity="0.5"/>
+  <polygon points="200,183 178,210 185,205" fill="#d0e8ff" opacity="0.5"/>
+  <polygon points="200,198 222,210 200,248 178,210" fill="#5080c0" opacity="0.4"/>
+  <circle cx="197" cy="193" r="2.5" fill="white" opacity="0.9"/>
+
+  <!-- Smaller side diamonds flanking center -->
+  <polygon points="177,183 192,200 177,228 162,200" fill="url(#diaCh)" filter="url(#glowCh)" opacity="0.9"/>
+  <circle cx="174" cy="191" r="2" fill="white" opacity="0.7"/>
+  <polygon points="223,183 238,200 223,228 208,200" fill="url(#diaCh)" filter="url(#glowCh)" opacity="0.9"/>
+  <circle cx="220" cy="191" r="2" fill="white" opacity="0.7"/>
+
+  <!-- Even smaller outer diamonds -->
+  <polygon points="155,190 166,204 155,222 144,204" fill="url(#diaCh)" filter="url(#glowCh)" opacity="0.8"/>
+  <polygon points="245,190 256,204 245,222 234,204" fill="url(#diaCh)" filter="url(#glowCh)" opacity="0.8"/>
+
+  <!-- Diamond stations on band -->
+  <circle cx="125" cy="163" r="8" fill="url(#diaCh)" filter="url(#glowCh)"/>
+  <circle cx="125" cy="163" r="4" fill="white" opacity="0.5"/>
+  <circle cx="150" cy="157" r="7" fill="url(#diaCh)" filter="url(#glowCh)"/>
+  <circle cx="275" cy="163" r="8" fill="url(#diaCh)" filter="url(#glowCh)"/>
+  <circle cx="250" cy="157" r="7" fill="url(#diaCh)" filter="url(#glowCh)"/>
+
+  <!-- Small diamonds on band scattered -->
+  <circle cx="85" cy="183" r="5" fill="url(#diaCh)" filter="url(#glowCh)"/>
+  <circle cx="105" cy="170" r="5.5" fill="url(#diaCh)" filter="url(#glowCh)"/>
+  <circle cx="295" cy="170" r="5.5" fill="url(#diaCh)" filter="url(#glowCh)"/>
+  <circle cx="315" cy="183" r="5" fill="url(#diaCh)" filter="url(#glowCh)"/>
+
+  <!-- Gold prong caps on diamonds -->
+  <circle cx="200" cy="183" r="4" fill="#c8a020"/>
+  <circle cx="200" cy="248" r="4" fill="#c8a020"/>
+  <circle cx="178" cy="210" r="3" fill="#c8a020"/>
+  <circle cx="222" cy="210" r="3" fill="#c8a020"/>
+
+  <!-- Clasp -->
+  <rect x="40" y="213" width="20" height="12" rx="4" fill="#c8a020" stroke="#ffe566" stroke-width="1.5"/>
+  <circle cx="50" cy="219" r="3" fill="#ffe566"/>
+
+  <!-- Shadow -->
+  <ellipse cx="200" cy="295" rx="150" ry="12" fill="#c8a020" opacity="0.07"/>
+
+  <!-- Sparkles -->
+  <line x1="200" y1="125" x2="200" y2="112" stroke="white" stroke-width="1.5" opacity="0.5"/>
+  <line x1="193" y1="118" x2="207" y2="118" stroke="white" stroke-width="1.5" opacity="0.5"/>
+  <line x1="140" y1="130" x2="140" y2="120" stroke="#ffe566" stroke-width="1" opacity="0.6"/>
+  <line x1="135" y1="125" x2="145" y2="125" stroke="#ffe566" stroke-width="1" opacity="0.6"/>
+  <line x1="262" y1="128" x2="262" y2="120" stroke="#ffe566" stroke-width="1" opacity="0.6"/>
+  <line x1="257" y1="124" x2="267" y2="124" stroke="#ffe566" stroke-width="1" opacity="0.6"/>
+
+  <text x="200" y="355" text-anchor="middle" font-family="Georgia, serif" font-size="16" fill="#c8a020" letter-spacing="3">RJ HOUSE</text>
+  <text x="200" y="375" text-anchor="middle" font-family="Georgia, serif" font-size="11" fill="#888" letter-spacing="1">DIAMOND CHOKER NECKLACE</text>
+</svg>

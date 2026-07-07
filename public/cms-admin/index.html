@@ -1,0 +1,1314 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RJ House — Content Management System</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+  <link rel="stylesheet" href="https://cdn.quilljs.com/1.3.7/quill.snow.css">
+  <script src="https://cdn.quilljs.com/1.3.7/quill.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            gold: { DEFAULT: '#c8a96e', light: '#d4bb8a', dark: '#a88845' },
+            rj: { bg: '#fafaf9', sidebar: '#f5f4f2', dark: '#212734' }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    [x-cloak] { display: none !important; }
+    .sidebar-item { transition: all 0.15s ease; }
+    .sidebar-item.active { background: #fff3e0; border-left: 3px solid #c8a96e; color: #c8a96e; }
+    .sidebar-item.active .section-label { color: #c8a96e; }
+    .sidebar-item:hover:not(.active) { background: #f5f4f2; }
+    .section-card { transition: all 0.2s ease; }
+    .section-card:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+    .drag-handle { cursor: grab; }
+    .drag-handle:active { cursor: grabbing; }
+    .ql-container { min-height: 120px; }
+    .ql-editor { min-height: 100px; font-size: 14px; }
+    input[type=color] { cursor: pointer; padding: 2px; border-radius: 4px; }
+    .toggle { position: relative; display: inline-block; width: 44px; height: 24px; }
+    .toggle input { opacity: 0; width: 0; height: 0; }
+    .slider { position: absolute; cursor: pointer; inset: 0; background: #d1d5db; border-radius: 24px; transition: 0.3s; }
+    .slider:before { position: absolute; content: ""; height: 18px; width: 18px; left: 3px; bottom: 3px; background: white; border-radius: 50%; transition: 0.3s; }
+    input:checked + .slider { background: #c8a96e; }
+    input:checked + .slider:before { transform: translateX(20px); }
+    .field-label { font-size: 11px; font-weight: 600; color: #6b7280; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px; display: block; }
+    .field-input { width: 100%; border: 1px solid #e5e7eb; border-radius: 6px; padding: 8px 10px; font-size: 13px; color: #374151; outline: none; transition: border-color 0.15s; }
+    .field-input:focus { border-color: #c8a96e; box-shadow: 0 0 0 2px rgba(200,169,110,0.12); }
+    .btn-primary { background: #c8a96e; color: white; border-radius: 6px; padding: 8px 16px; font-size: 13px; font-weight: 600; border: none; cursor: pointer; transition: background 0.15s; display: inline-flex; align-items: center; gap: 6px; }
+    .btn-primary:hover { background: #a88845; }
+    .btn-outline { background: white; color: #374151; border: 1px solid #e5e7eb; border-radius: 6px; padding: 8px 16px; font-size: 13px; font-weight: 500; cursor: pointer; transition: all 0.15s; display: inline-flex; align-items: center; gap: 6px; }
+    .btn-outline:hover { border-color: #9ca3af; background: #f9fafb; }
+    .btn-danger { background: #ef4444; color: white; border-radius: 6px; padding: 6px 12px; font-size: 12px; cursor: pointer; border: none; }
+    .btn-danger:hover { background: #dc2626; }
+    .image-dropzone { border: 2px dashed #d1d5db; border-radius: 8px; padding: 24px; text-align: center; cursor: pointer; transition: border-color 0.15s; background: #fafaf9; }
+    .image-dropzone:hover { border-color: #c8a96e; }
+    .image-dropzone.has-image { border-style: solid; border-color: #c8a96e; }
+    .media-item { aspect-ratio: 1; object-fit: cover; border-radius: 6px; cursor: pointer; border: 2px solid transparent; transition: border-color 0.15s; }
+    .media-item:hover { border-color: #c8a96e; }
+    .media-item.selected { border-color: #c8a96e; }
+    .toast { position: fixed; bottom: 24px; right: 24px; background: #1f2937; color: white; padding: 12px 20px; border-radius: 8px; font-size: 13px; z-index: 9999; opacity: 0; transform: translateY(10px); transition: all 0.3s; pointer-events: none; }
+    .toast.show { opacity: 1; transform: translateY(0); }
+    .toast.success { background: #059669; }
+    .toast.error { background: #dc2626; }
+    .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 1000; display: flex; align-items: center; justify-content: center; padding: 20px; }
+    .modal-box { background: white; border-radius: 12px; max-height: 90vh; overflow-y: auto; width: 100%; }
+    .login-card { max-width: 400px; margin: auto; }
+    .spinner { display: inline-block; width: 16px; height: 16px; border: 2px solid rgba(255,255,255,0.3); border-top-color: white; border-radius: 50%; animation: spin 0.6s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .caution-bar { background: #fef9f0; border: 1px solid #fde68a; border-radius: 6px; padding: 10px 14px; margin-bottom: 16px; font-size: 12px; color: #92400e; }
+  </style>
+</head>
+<body class="bg-rj-bg" x-data="cmsApp()" x-init="init()">
+
+<!-- Toast Notification -->
+<div class="toast" :class="{ show: toast.show, success: toast.type==='success', error: toast.type==='error' }" x-text="toast.message"></div>
+
+<!-- Login Screen -->
+<div x-cloak x-show="!isLoggedIn" class="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-900 to-gray-800 p-4">
+  <div class="login-card w-full">
+    <div class="bg-white rounded-2xl p-8 shadow-2xl">
+      <div class="text-center mb-8">
+        <div class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-amber-50 mb-4">
+          <i class="fas fa-gem text-gold text-2xl"></i>
+        </div>
+        <h1 class="text-2xl font-bold text-gray-900">RJ House CMS</h1>
+        <p class="text-gray-500 text-sm mt-1">Sign in to manage content</p>
+      </div>
+      <form @submit.prevent="login" class="space-y-4">
+        <div>
+          <label class="field-label">Email</label>
+          <input x-model="loginForm.email" type="email" class="field-input" placeholder="admin@rjhouse.com" required>
+        </div>
+        <div>
+          <label class="field-label">Password</label>
+          <input x-model="loginForm.password" type="password" class="field-input" placeholder="••••••••" required>
+        </div>
+        <button type="submit" class="btn-primary w-full justify-center py-3" :disabled="loginLoading">
+          <span x-show="loginLoading" class="spinner"></span>
+          <span x-show="!loginLoading">Sign In</span>
+        </button>
+        <p x-show="loginError" class="text-red-500 text-center text-sm" x-text="loginError"></p>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Main App -->
+<div x-cloak x-show="isLoggedIn" class="min-h-screen flex flex-col">
+
+  <!-- Top Bar -->
+  <header class="bg-white border-b border-gray-200 px-6 py-3 flex items-center justify-between z-20 sticky top-0">
+    <div>
+      <h1 class="text-lg font-bold text-gray-900">Content Management System</h1>
+      <p class="text-xs text-gray-500">Edit section-wise content for RJ House store pages</p>
+    </div>
+    <div class="flex items-center gap-3">
+      <button @click="goBack()" class="btn-outline text-sm">
+        <i class="fas fa-arrow-left text-xs"></i> Back to page
+      </button>
+      <button @click="saveCurrentSection()" class="btn-primary" :disabled="saving">
+        <span x-show="saving" class="spinner"></span>
+        <i x-show="!saving" class="fas fa-floppy-disk text-sm"></i>
+        <span x-show="!saving">Save changes</span>
+      </button>
+      <button @click="logout()" class="btn-outline text-sm text-gray-500">
+        <i class="fas fa-sign-out-alt text-xs"></i>
+      </button>
+    </div>
+  </header>
+
+  <!-- Caution Banner -->
+  <div class="px-6 pt-3">
+    <div class="caution-bar flex items-start gap-2">
+      <i class="fas fa-bolt text-amber-500 mt-0.5 text-xs"></i>
+      <div>
+        <strong>Caution</strong>
+        Check page before configuring this section. By selecting <strong>"All Pages"</strong> the changes applied will be configured to all the pages of website for any Global components.
+      </div>
+    </div>
+  </div>
+
+  <!-- Main Content Area -->
+  <div class="flex flex-1 overflow-hidden gap-0">
+
+    <!-- Left Sidebar: Pages List -->
+    <div class="w-52 bg-white border-r border-gray-200 flex flex-col flex-shrink-0">
+      <div class="px-4 py-3 border-b border-gray-100">
+        <span class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Pages</span>
+      </div>
+      <div class="flex-1 overflow-y-auto py-2">
+        <template x-for="page in pages" :key="page.slug">
+          <button
+            @click="selectPage(page)"
+            class="w-full text-left px-4 py-2.5 sidebar-item"
+            :class="{ active: selectedPage?.slug === page.slug }"
+          >
+            <div class="text-sm font-medium section-label text-gray-700" x-text="page.label"></div>
+          </button>
+        </template>
+      </div>
+      <!-- Media Library Button -->
+      <div class="p-3 border-t border-gray-100">
+        <button @click="openMediaLibrary()" class="w-full btn-outline text-xs py-2 justify-center">
+          <i class="fas fa-images"></i> Media Library
+        </button>
+      </div>
+    </div>
+
+    <!-- Middle: Sections List -->
+    <div class="w-56 bg-rj-sidebar border-r border-gray-200 flex flex-col flex-shrink-0">
+      <div class="px-4 py-3 border-b border-gray-100">
+        <span class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Sections configuration</span>
+      </div>
+      <div id="sections-sortable" class="flex-1 overflow-y-auto py-2 space-y-0.5" x-ref="sectionsList">
+        <template x-for="section in sections" :key="section.id">
+          <div
+            class="sidebar-item cursor-pointer flex items-center gap-2 px-3 py-2.5"
+            :class="{ active: activeSection?.id === section.id }"
+            @click="selectSection(section)"
+            :data-id="section.id"
+          >
+            <i class="fas fa-grip-vertical text-gray-300 text-xs drag-handle flex-shrink-0"></i>
+            <div class="min-w-0 flex-1">
+              <div class="text-xs font-semibold section-label text-gray-700 truncate" x-text="section.label || section.sectionKey"></div>
+              <div class="text-xs text-gray-400 truncate" x-text="section.description || section.sectionType"></div>
+            </div>
+            <button @click.stop="deleteSection(section)" class="opacity-0 group-hover:opacity-100 text-gray-300 hover:text-red-400 text-xs flex-shrink-0" title="Delete">
+              <i class="fas fa-trash text-[10px]"></i>
+            </button>
+          </div>
+        </template>
+      </div>
+    </div>
+
+    <!-- Center: Section Editor -->
+    <div class="flex-1 overflow-y-auto p-6" style="min-width: 0;">
+      <!-- Loading state -->
+      <div x-show="loadingSections" class="flex items-center justify-center h-64">
+        <div class="text-center">
+          <div class="inline-block w-8 h-8 border-4 border-gold border-t-transparent rounded-full animate-spin mb-3"></div>
+          <p class="text-gray-500 text-sm">Loading sections…</p>
+        </div>
+      </div>
+
+      <!-- No page selected -->
+      <div x-show="!selectedPage && !loadingSections" class="flex items-center justify-center h-64">
+        <div class="text-center text-gray-400">
+          <i class="fas fa-hand-pointer text-4xl mb-3 opacity-30"></i>
+          <p class="text-sm">Select a page from the left sidebar to begin editing</p>
+        </div>
+      </div>
+
+      <!-- Section Editor -->
+      <div x-show="activeSection && !loadingSections">
+        <!-- Section Header -->
+        <div class="flex items-center justify-between mb-5">
+          <div>
+            <h2 class="text-base font-bold text-gray-900" x-text="activeSection?.label"></h2>
+            <p class="text-xs text-gray-500" x-text="activeSection?.description"></p>
+          </div>
+          <div class="flex items-center gap-3">
+            <select
+              x-model="currentPageSlug"
+              class="field-input text-xs py-1.5 w-40"
+              @change="changePage($event.target.value)"
+            >
+              <template x-for="p in pages" :key="p.slug">
+                <option :value="p.slug" x-text="p.label"></option>
+              </template>
+            </select>
+          </div>
+        </div>
+
+        <!-- Dynamic Section Editor based on sectionKey -->
+        <div class="bg-white rounded-xl border border-gray-200 p-6 mb-4">
+          <!-- SECTION: top-header -->
+          <template x-if="activeSection?.sectionKey === 'top-header'">
+            <div>
+              <div class="text-xs font-bold text-gray-600 uppercase tracking-wider mb-4">SECTION</div>
+              <div>
+                <label class="field-label">Announcement Text</label>
+                <input type="text" class="field-input" x-model="editContent.text" placeholder="Free shipping on orders above ₹5000">
+              </div>
+              <div class="mt-4">
+                <label class="field-label">Background Color</label>
+                <div class="flex items-center gap-2">
+                  <input type="color" x-model="editContent.backgroundColor" class="w-10 h-8 rounded border border-gray-200">
+                  <input type="text" class="field-input" style="max-width: 140px" x-model="editContent.backgroundColor" placeholder="#000000">
+                </div>
+              </div>
+              <div class="mt-4">
+                <label class="field-label">Text Color</label>
+                <div class="flex items-center gap-2">
+                  <input type="color" x-model="editContent.textColor" class="w-10 h-8 rounded border border-gray-200">
+                  <input type="text" class="field-input" style="max-width: 140px" x-model="editContent.textColor" placeholder="#ffffff">
+                </div>
+              </div>
+            </div>
+          </template>
+
+          <!-- SECTION: header -->
+          <template x-if="activeSection?.sectionKey === 'header'">
+            <div>
+              <div class="text-xs font-bold text-gray-600 uppercase tracking-wider mb-4">HEADER ICONS</div>
+              <div class="space-y-3">
+                <template x-for="(icon, idx) in (editContent.icons || [])" :key="idx">
+                  <div class="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
+                    <div class="flex-1">
+                      <span class="text-sm font-medium text-gray-700" x-text="icon.label"></span>
+                      <span class="text-xs text-gray-400 ml-2" x-text="icon.link"></span>
+                    </div>
+                    <label class="toggle flex-shrink-0">
+                      <input type="checkbox" x-model="icon.enabled">
+                      <span class="slider"></span>
+                    </label>
+                  </div>
+                </template>
+              </div>
+
+              <div class="text-xs font-bold text-gray-600 uppercase tracking-wider mt-6 mb-4">MENU OPTIONS</div>
+              <div class="space-y-2" id="menu-items-list">
+                <template x-for="(item, idx) in (editContent.menuItems || [])" :key="idx">
+                  <div class="border border-gray-200 rounded-lg p-3 bg-white">
+                    <div class="flex items-center gap-2 mb-2">
+                      <input type="text" class="field-input flex-1" x-model="item.title" placeholder="Menu title">
+                      <input type="text" class="field-input flex-1" x-model="item.link" placeholder="/link">
+                      <button @click="(editContent.menuItems || []).splice(idx, 1)" class="text-red-400 hover:text-red-600 text-xs flex-shrink-0">
+                        <i class="fas fa-trash"></i>
+                      </button>
+                    </div>
+                    <div class="space-y-1">
+                      <template x-for="(col, ci) in (item.columns || [])" :key="ci">
+                        <div class="flex items-center gap-2 ml-4">
+                          <span class="text-xs text-gray-400">Column</span>
+                          <input type="text" class="field-input flex-1 text-xs" x-model="col.title" placeholder="Column title">
+                          <button @click="item.columns.splice(ci, 1)" class="text-red-300 hover:text-red-500 text-xs">×</button>
+                        </div>
+                      </template>
+                      <button @click="(item.columns = item.columns || []).push({ title: '', links: [] })" class="text-xs text-gold hover:text-gold-dark ml-4">
+                        <i class="fas fa-plus text-xs"></i> Add mega menu column
+                      </button>
+                    </div>
+                  </div>
+                </template>
+              </div>
+              <button @click="(editContent.menuItems = editContent.menuItems || []).push({ title: '', link: '', columns: [] })" class="btn-outline text-xs mt-2">
+                <i class="fas fa-plus"></i> Add menu item
+              </button>
+            </div>
+          </template>
+
+          <!-- SECTION: hero-banner -->
+          <template x-if="activeSection?.sectionKey === 'hero-banner'">
+            <div>
+              <div class="text-xs font-bold text-gray-600 uppercase tracking-wider mb-4">SECTION</div>
+              <div class="mb-4">
+                <label class="field-label">Banner Image</label>
+                <div class="image-dropzone" :class="{ 'has-image': editContent.imageUrl }" @click="openMediaPicker('imageUrl')">
+                  <template x-if="editContent.imageUrl">
+                    <div>
+                      <img :src="editContent.imageUrl" class="w-full max-h-48 object-cover rounded-lg">
+                      <p class="text-xs text-gold mt-2">Click to change image</p>
+                    </div>
+                  </template>
+                  <template x-if="!editContent.imageUrl">
+                    <div>
+                      <i class="fas fa-cloud-upload-alt text-3xl text-gray-300 mb-2"></i>
+                      <p class="text-sm text-gray-500">Click to upload or select banner image</p>
+                      <p class="text-xs text-gray-400 mt-1">Recommended: 1920×800px</p>
+                    </div>
+                  </template>
+                </div>
+              </div>
+              <div class="grid grid-cols-2 gap-4">
+                <div>
+                  <label class="field-label">Heading</label>
+                  <input type="text" class="field-input" x-model="editContent.heading" placeholder="Exquisite Fine Jewelry">
+                </div>
+                <div>
+                  <label class="field-label">Sub-Heading</label>
+                  <input type="text" class="field-input" x-model="editContent.subHeading" placeholder="Discover timeless elegance">
+                </div>
+              </div>
+              <div class="text-xs font-bold text-gray-600 uppercase tracking-wider mt-6 mb-4">CTA BUTTONS</div>
+              <div class="grid grid-cols-2 gap-4">
+                <div class="p-3 bg-gray-50 rounded-lg space-y-2">
+                  <p class="text-xs font-semibold text-gray-600">Primary CTA</p>
+                  <input type="text" class="field-input text-xs" x-model="editContent.cta1Text" placeholder="Shop Now">
+                  <input type="text" class="field-input text-xs" x-model="editContent.cta1Link" placeholder="/product">
+                  <select class="field-input text-xs" x-model="editContent.cta1Style">
+                    <option value="primary">Primary (Filled)</option>
+                    <option value="outline">Outline</option>
+                    <option value="ghost">Ghost</option>
+                  </select>
+                </div>
+                <div class="p-3 bg-gray-50 rounded-lg space-y-2">
+                  <p class="text-xs font-semibold text-gray-600">Secondary CTA</p>
+                  <input type="text" class="field-input text-xs" x-model="editContent.cta2Text" placeholder="Explore Collections">
+                  <input type="text" class="field-input text-xs" x-model="editContent.cta2Link" placeholder="/collection">
+                  <select class="field-input text-xs" x-model="editContent.cta2Style">
+                    <option value="outline">Outline</option>
+                    <option value="primary">Primary (Filled)</option>
+                    <option value="ghost">Ghost</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+          </template>
+
+          <!-- SECTION: featured-collection / product-variants (banners grid) -->
+          <template x-if="activeSection?.sectionKey === 'featured-collection' || activeSection?.sectionKey === 'product-variants'">
+            <div>
+              <div class="text-xs font-bold text-gray-600 uppercase tracking-wider mb-4">SECTION</div>
+              <div class="grid grid-cols-2 gap-4 mb-4">
+                <div>
+                  <label class="field-label">Heading</label>
+                  <input type="text" class="field-input" x-model="editContent.heading" placeholder="Featured Collections">
+                </div>
+                <div>
+                  <label class="field-label">Sub-Heading</label>
+                  <input type="text" class="field-input" x-model="editContent.subHeading" placeholder="Timeless Elegance">
+                </div>
+              </div>
+              <div class="mb-4">
+                <label class="field-label">Background Color</label>
+                <div class="flex items-center gap-2">
+                  <input type="color" x-model="editContent.backgroundColor" class="w-10 h-8 rounded border border-gray-200">
+                  <input type="text" class="field-input" style="max-width: 140px" x-model="editContent.backgroundColor" placeholder="#FFFFFF">
+                </div>
+              </div>
+              <div class="text-xs font-bold text-gray-600 uppercase tracking-wider mb-4">BANNERS</div>
+              <div class="space-y-4">
+                <template x-for="(banner, idx) in (editContent.banners || [])" :key="idx">
+                  <div class="border border-gray-200 rounded-lg p-4 bg-white">
+                    <div class="flex items-center justify-between mb-3">
+                      <span class="text-sm font-semibold text-gray-700" x-text="'Banner-' + (idx + 1)"></span>
+                      <div class="flex items-center gap-3">
+                        <span class="text-xs text-gray-500">Open in new tab</span>
+                        <label class="toggle">
+                          <input type="checkbox" x-model="banner.openInNewTab">
+                          <span class="slider"></span>
+                        </label>
+                        <button @click="(editContent.banners || []).splice(idx, 1)" class="text-red-400 hover:text-red-600 text-xs">
+                          <i class="fas fa-trash"></i>
+                        </button>
+                      </div>
+                    </div>
+                    <div class="flex gap-4">
+                      <div class="w-20 h-20 flex-shrink-0 cursor-pointer rounded-lg overflow-hidden border border-gray-200 bg-gray-50 flex items-center justify-center" @click="openMediaPickerForBanner(idx, 'imageUrl')">
+                        <template x-if="banner.imageUrl">
+                          <img :src="banner.imageUrl" class="w-full h-full object-cover">
+                        </template>
+                        <template x-if="!banner.imageUrl">
+                          <i class="fas fa-image text-gray-300 text-2xl"></i>
+                        </template>
+                      </div>
+                      <div class="flex-1 grid grid-cols-2 gap-2">
+                        <div>
+                          <label class="field-label">Text</label>
+                          <input type="text" class="field-input text-xs" x-model="banner.text" placeholder="Banner text">
+                        </div>
+                        <div>
+                          <label class="field-label">Link</label>
+                          <div class="flex items-center border border-gray-200 rounded-md overflow-hidden focus-within:border-gold">
+                            <span class="px-2 text-gray-400 text-xs bg-gray-50 border-r border-gray-200 py-2">/</span>
+                            <input type="text" class="flex-1 px-2 py-1.5 text-xs outline-none" x-model="banner.linkPath" placeholder="collection/rings" @input="banner.link = '/' + $event.target.value">
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </template>
+              </div>
+              <button @click="addBanner()" class="btn-outline text-xs mt-3">
+                <i class="fas fa-plus"></i> Add Banner
+              </button>
+            </div>
+          </template>
+
+          <!-- SECTION: why-choose -->
+          <template x-if="activeSection?.sectionKey === 'why-choose'">
+            <div>
+              <div class="text-xs font-bold text-gray-600 uppercase tracking-wider mb-4">SECTION</div>
+              <div class="grid grid-cols-2 gap-4 mb-4">
+                <div>
+                  <label class="field-label">Heading</label>
+                  <input type="text" class="field-input" x-model="editContent.heading" placeholder="Why Choose Us">
+                </div>
+                <div>
+                  <label class="field-label">Sub-Heading</label>
+                  <input type="text" class="field-input" x-model="editContent.subHeading" placeholder="We craft jewelry...">
+                </div>
+              </div>
+              <div class="mb-4">
+                <label class="field-label">Video URL</label>
+                <input type="text" class="field-input" x-model="editContent.videoUrl" placeholder="https://youtube.com/...">
+              </div>
+              <div class="text-xs font-bold text-gray-600 uppercase tracking-wider mb-3">FEATURES</div>
+              <div class="space-y-3">
+                <template x-for="(feat, idx) in (editContent.features || [])" :key="idx">
+                  <div class="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
+                    <input type="text" class="field-input w-16 text-center" x-model="feat.icon" placeholder="💎">
+                    <input type="text" class="field-input flex-1" x-model="feat.title" placeholder="Feature title">
+                    <input type="text" class="field-input flex-1" x-model="feat.description" placeholder="Short description">
+                    <button @click="(editContent.features || []).splice(idx, 1)" class="text-red-400 text-xs">
+                      <i class="fas fa-trash"></i>
+                    </button>
+                  </div>
+                </template>
+                <button @click="(editContent.features = editContent.features || []).push({ icon: '✨', title: '', description: '' })" class="btn-outline text-xs">
+                  <i class="fas fa-plus"></i> Add Feature
+                </button>
+              </div>
+            </div>
+          </template>
+
+          <!-- SECTION: newsletter -->
+          <template x-if="activeSection?.sectionKey === 'newsletter'">
+            <div>
+              <div class="text-xs font-bold text-gray-600 uppercase tracking-wider mb-4">SECTION</div>
+              <div class="grid grid-cols-2 gap-4 mb-4">
+                <div>
+                  <label class="field-label">Heading</label>
+                  <input type="text" class="field-input" x-model="editContent.heading" placeholder="Stay in the Loop">
+                </div>
+                <div>
+                  <label class="field-label">Sub-Heading</label>
+                  <input type="text" class="field-input" x-model="editContent.subHeading" placeholder="Subscribe for exclusive offers">
+                </div>
+              </div>
+              <div class="mb-4">
+                <label class="field-label">Background Color</label>
+                <div class="flex items-center gap-2">
+                  <input type="color" x-model="editContent.backgroundColor" class="w-10 h-8 rounded border border-gray-200">
+                  <input type="text" class="field-input" style="max-width: 140px" x-model="editContent.backgroundColor">
+                </div>
+              </div>
+              <div class="text-xs font-bold text-gray-600 uppercase tracking-wider mt-4 mb-3">INPUT FIELD</div>
+              <div class="grid grid-cols-2 gap-4">
+                <div>
+                  <label class="field-label">Placeholder</label>
+                  <input type="text" class="field-input" x-model="editContent.placeholder" placeholder="Enter your email address">
+                </div>
+                <div>
+                  <label class="field-label">Privacy Text</label>
+                  <input type="text" class="field-input" x-model="editContent.privacyText" placeholder="By subscribing...">
+                </div>
+              </div>
+              <div class="text-xs font-bold text-gray-600 uppercase tracking-wider mt-4 mb-3">BUTTON</div>
+              <div class="grid grid-cols-4 gap-3 p-3 bg-gray-50 rounded-lg">
+                <div>
+                  <label class="field-label">CTA Text</label>
+                  <input type="text" class="field-input text-xs" x-model="editContent.button.text" placeholder="Subscribe">
+                </div>
+                <div>
+                  <label class="field-label">CTA Link</label>
+                  <input type="text" class="field-input text-xs" x-model="editContent.button.link" placeholder="/newsletter">
+                </div>
+                <div>
+                  <label class="field-label">Button Color</label>
+                  <div class="flex items-center gap-1">
+                    <input type="color" x-model="editContent.button.color" class="w-8 h-7 rounded border border-gray-200">
+                    <input type="text" class="field-input text-xs" x-model="editContent.button.color">
+                  </div>
+                </div>
+                <div>
+                  <label class="field-label">Text Color</label>
+                  <div class="flex items-center gap-1">
+                    <input type="color" x-model="editContent.button.textColor" class="w-8 h-7 rounded border border-gray-200">
+                    <input type="text" class="field-input text-xs" x-model="editContent.button.textColor">
+                  </div>
+                </div>
+              </div>
+              <div class="text-xs font-bold text-gray-600 uppercase tracking-wider mt-4 mb-3">SOCIAL LINKS</div>
+              <div class="space-y-2">
+                <template x-for="(social, idx) in (editContent.socialLinks || [])" :key="idx">
+                  <div class="flex items-center gap-3 p-2 bg-gray-50 rounded">
+                    <label class="toggle flex-shrink-0">
+                      <input type="checkbox" x-model="social.enabled">
+                      <span class="slider"></span>
+                    </label>
+                    <span class="text-xs font-medium text-gray-700 w-20" x-text="social.platform"></span>
+                    <input type="text" class="field-input flex-1 text-xs" x-model="social.url" placeholder="https://...">
+                  </div>
+                </template>
+              </div>
+            </div>
+          </template>
+
+          <!-- SECTION: customer-reviews -->
+          <template x-if="activeSection?.sectionKey === 'customer-reviews'">
+            <div>
+              <div class="text-xs font-bold text-gray-600 uppercase tracking-wider mb-4">SECTION</div>
+              <div class="grid grid-cols-2 gap-4 mb-4">
+                <div>
+                  <label class="field-label">Heading</label>
+                  <input type="text" class="field-input" x-model="editContent.heading" placeholder="What Our Customers Say">
+                </div>
+                <div>
+                  <label class="field-label">Sub-Heading</label>
+                  <input type="text" class="field-input" x-model="editContent.subHeading" placeholder="Real stories...">
+                </div>
+              </div>
+              <div class="text-xs font-bold text-gray-600 uppercase tracking-wider mb-3">REVIEWS</div>
+              <div class="space-y-4">
+                <template x-for="(review, idx) in (editContent.reviews || [])" :key="idx">
+                  <div class="border border-gray-200 rounded-lg p-4 bg-white">
+                    <div class="flex items-center justify-between mb-3">
+                      <span class="text-sm font-semibold text-gray-700" x-text="'Review-' + (idx + 1)"></span>
+                      <div class="flex items-center gap-3">
+                        <span class="text-xs text-gray-500">Open in new tab</span>
+                        <label class="toggle">
+                          <input type="checkbox" x-model="review.openInNewTab">
+                          <span class="slider"></span>
+                        </label>
+                        <button @click="(editContent.reviews || []).splice(idx, 1)" class="btn-danger text-xs">
+                          <i class="fas fa-trash"></i>
+                        </button>
+                      </div>
+                    </div>
+                    <div class="flex gap-4 mb-3">
+                      <div class="w-20 h-20 flex-shrink-0 cursor-pointer rounded-lg overflow-hidden border border-gray-200 bg-gray-50 flex items-center justify-center relative group" @click="openMediaPickerForReview(idx)">
+                        <template x-if="review.imageUrl">
+                          <img :src="review.imageUrl" class="w-full h-full object-cover">
+                        </template>
+                        <template x-if="!review.imageUrl">
+                          <i class="fas fa-image text-gray-300 text-2xl"></i>
+                        </template>
+                        <div class="absolute inset-0 bg-black bg-opacity-30 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                          <i class="fas fa-edit text-white text-xs"></i>
+                        </div>
+                      </div>
+                      <div class="flex-1 grid grid-cols-2 gap-2">
+                        <div>
+                          <label class="field-label">Name / Title</label>
+                          <input type="text" class="field-input text-xs" x-model="review.text" placeholder="Customer name">
+                        </div>
+                        <div>
+                          <label class="field-label">Rating (1-5)</label>
+                          <input type="number" class="field-input text-xs" x-model="review.rating" min="1" max="5">
+                        </div>
+                        <div class="col-span-2">
+                          <label class="field-label">Review Link</label>
+                          <input type="text" class="field-input text-xs" x-model="review.link" placeholder="/reviews/123">
+                        </div>
+                      </div>
+                    </div>
+                    <div>
+                      <label class="field-label">Description</label>
+                      <textarea class="field-input" rows="2" x-model="review.description" placeholder="Review text..."></textarea>
+                    </div>
+                  </div>
+                </template>
+              </div>
+              <button @click="(editContent.reviews = editContent.reviews || []).push({ imageUrl: '', text: '', link: '', openInNewTab: false, description: '', rating: 5 })" class="btn-outline text-xs mt-3">
+                <i class="fas fa-plus"></i> Add Review
+              </button>
+            </div>
+          </template>
+
+          <!-- SECTION: footer -->
+          <template x-if="activeSection?.sectionKey === 'footer'">
+            <div>
+              <div class="text-xs font-bold text-gray-600 uppercase tracking-wider mb-4">COLUMNS</div>
+              <div class="space-y-4">
+                <template x-for="(col, ci) in (editContent.columns || [])" :key="ci">
+                  <div class="border border-gray-200 rounded-lg p-4 bg-white">
+                    <div class="flex items-center justify-between mb-3">
+                      <input type="text" class="field-input font-semibold w-48" x-model="col.title" placeholder="Column title">
+                      <button @click="(editContent.columns || []).splice(ci, 1)" class="text-red-400 hover:text-red-600 text-xs">
+                        <i class="fas fa-trash"></i>
+                      </button>
+                    </div>
+                    <div class="space-y-2 ml-2">
+                      <template x-for="(link, li) in (col.links || [])" :key="li">
+                        <div class="border border-gray-100 rounded-lg p-3 bg-gray-50">
+                          <div class="flex items-center gap-2 mb-2">
+                            <input type="text" class="field-input flex-1 text-xs" x-model="link.title" placeholder="Link title">
+                            <input type="text" class="field-input flex-1 text-xs" x-model="link.link" placeholder="/about">
+                            <button @click="(col.links || []).splice(li, 1)" class="text-red-300 hover:text-red-500 text-xs">
+                              <i class="fas fa-trash text-[10px]"></i>
+                            </button>
+                          </div>
+                          <!-- Sub-links -->
+                          <div class="space-y-1 ml-3">
+                            <template x-for="(sub, si) in (link.subLinks || [])" :key="si">
+                              <div class="flex items-center gap-2">
+                                <input type="text" class="field-input flex-1 text-xs" x-model="sub.title" placeholder="Sub-link title">
+                                <input type="text" class="field-input flex-1 text-xs" x-model="sub.link" placeholder="/link">
+                                <button @click="(link.subLinks || []).splice(si, 1)" class="text-red-300 text-xs">×</button>
+                              </div>
+                            </template>
+                            <button @click="(link.subLinks = link.subLinks || []).push({ title: '', link: '' })" class="text-xs text-gold hover:text-gold-dark">
+                              <i class="fas fa-plus text-[10px]"></i> Add sub-link
+                            </button>
+                          </div>
+                        </div>
+                      </template>
+                      <button @click="(col.links = col.links || []).push({ title: '', link: '', subLinks: [] })" class="btn-outline text-xs">
+                        <i class="fas fa-plus"></i> Add link
+                      </button>
+                    </div>
+                  </div>
+                </template>
+              </div>
+              <button @click="(editContent.columns = editContent.columns || []).push({ title: '', links: [] })" class="btn-outline text-xs mt-3">
+                <i class="fas fa-plus"></i> Add Column
+              </button>
+
+              <div class="text-xs font-bold text-gray-600 uppercase tracking-wider mt-6 mb-3">FOOTER BOTTOM BAR</div>
+              <div class="grid grid-cols-2 gap-4 p-3 bg-gray-50 rounded-lg">
+                <div>
+                  <label class="field-label">Copyright Text</label>
+                  <input type="text" class="field-input text-xs" x-model="editContent.bottomBar.copyright" placeholder="© 2026 RJ House">
+                </div>
+                <div>
+                  <label class="field-label">Bottom Links</label>
+                  <div class="space-y-1">
+                    <template x-for="(bl, bli) in (editContent.bottomBar?.links || [])" :key="bli">
+                      <div class="flex items-center gap-1">
+                        <input type="text" class="field-input flex-1 text-xs" x-model="bl.title" placeholder="Title">
+                        <input type="text" class="field-input flex-1 text-xs" x-model="bl.link" placeholder="/link">
+                        <button @click="(editContent.bottomBar.links || []).splice(bli, 1)" class="text-red-300 text-xs">×</button>
+                      </div>
+                    </template>
+                    <button @click="(editContent.bottomBar.links = editContent.bottomBar?.links || []).push({ title: '', link: '' })" class="text-xs text-gold">
+                      <i class="fas fa-plus text-[10px]"></i> Add
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </template>
+
+          <!-- SECTION: generic / unknown -->
+          <template x-if="!['top-header','header','hero-banner','featured-collection','product-variants','why-choose','newsletter','customer-reviews','footer'].includes(activeSection?.sectionKey)">
+            <div>
+              <div class="text-xs font-bold text-gray-600 uppercase tracking-wider mb-4">SECTION CONTENT</div>
+              <div class="space-y-4">
+                <div x-show="editContent.heading !== undefined">
+                  <label class="field-label">Heading</label>
+                  <input type="text" class="field-input" x-model="editContent.heading" placeholder="Section heading">
+                </div>
+                <div x-show="editContent.subHeading !== undefined">
+                  <label class="field-label">Sub-Heading</label>
+                  <textarea class="field-input" rows="2" x-model="editContent.subHeading" placeholder="Sub-heading text"></textarea>
+                </div>
+                <div x-show="editContent.imageUrl !== undefined">
+                  <label class="field-label">Image</label>
+                  <div class="image-dropzone" :class="{ 'has-image': editContent.imageUrl }" @click="openMediaPicker('imageUrl')">
+                    <template x-if="editContent.imageUrl">
+                      <img :src="editContent.imageUrl" class="w-full max-h-48 object-cover rounded-lg">
+                    </template>
+                    <template x-if="!editContent.imageUrl">
+                      <div>
+                        <i class="fas fa-cloud-upload-alt text-3xl text-gray-300 mb-2"></i>
+                        <p class="text-sm text-gray-500">Click to upload image</p>
+                      </div>
+                    </template>
+                  </div>
+                </div>
+                <div x-show="editContent.body !== undefined">
+                  <label class="field-label">Body Text</label>
+                  <textarea class="field-input" rows="5" x-model="editContent.body" placeholder="Section body content"></textarea>
+                </div>
+              </div>
+            </div>
+          </template>
+        </div>
+
+        <!-- Save/Reset bar -->
+        <div class="flex items-center justify-end gap-3 bg-white rounded-xl border border-gray-200 p-4">
+          <button @click="resetSection()" class="btn-outline text-sm">
+            <i class="fas fa-rotate-left text-xs"></i> Reset
+          </button>
+          <button @click="saveCurrentSection()" class="btn-primary" :disabled="saving">
+            <span x-show="saving" class="spinner"></span>
+            <i x-show="!saving" class="fas fa-floppy-disk text-sm"></i>
+            <span>Save Changes</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- No section selected -->
+      <div x-show="selectedPage && !activeSection && !loadingSections" class="flex items-center justify-center h-64">
+        <div class="text-center text-gray-400">
+          <i class="fas fa-mouse-pointer text-4xl mb-3 opacity-30"></i>
+          <p class="text-sm">Select a section from the left panel to edit its content</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right Panel: Page Status + Actions -->
+    <div class="w-60 flex-shrink-0 bg-white border-l border-gray-200 p-4 space-y-4">
+      <!-- Page Status -->
+      <div class="border border-gray-200 rounded-xl p-4">
+        <h3 class="text-xs font-bold text-gray-600 uppercase tracking-wider mb-3">Page Status</h3>
+        <div class="flex items-center justify-between mb-2">
+          <span class="text-sm font-semibold" :class="pageIsPublished ? 'text-green-600' : 'text-gray-500'" x-text="pageIsPublished ? 'Published' : 'Draft'"></span>
+          <button @click="togglePageStatus()" class="text-xs font-medium" :class="pageIsPublished ? 'text-orange-500 hover:text-orange-700' : 'text-green-600 hover:text-green-800'" x-text="pageIsPublished ? 'Unpublish' : 'Publish'"></button>
+        </div>
+        <p class="text-xs text-gray-400">Last Updated · <span x-text="lastUpdated"></span></p>
+        <p class="text-xs text-gray-400">By · Admin</p>
+      </div>
+
+      <!-- Components Deployment -->
+      <div class="border border-gray-200 rounded-xl p-4">
+        <h3 class="text-xs font-bold text-purple-600 uppercase tracking-wider mb-2 flex items-center gap-1">
+          <i class="fas fa-bolt text-xs"></i> Components Deployment
+        </h3>
+        <p class="text-xs text-gray-500 mb-3">Push new components to make them available.</p>
+        <button @click="addNewSection()" class="w-full btn-primary justify-center text-sm py-2.5">
+          <i class="fas fa-plus"></i> Add new section
+        </button>
+      </div>
+
+      <!-- Section Info -->
+      <div x-show="activeSection" class="border border-gray-200 rounded-xl p-4">
+        <h3 class="text-xs font-bold text-gray-600 uppercase tracking-wider mb-3">Section Info</h3>
+        <div class="space-y-2">
+          <div>
+            <label class="field-label">Label</label>
+            <input type="text" class="field-input text-xs" x-model="activeSection.label" placeholder="Section label">
+          </div>
+          <div>
+            <label class="field-label">Description</label>
+            <input type="text" class="field-input text-xs" x-model="activeSection.description" placeholder="Section description">
+          </div>
+          <div class="flex items-center justify-between pt-1">
+            <span class="text-xs text-gray-500">Visible</span>
+            <label class="toggle">
+              <input type="checkbox" x-model="activeSection.isPublished" @change="updateSectionVisibility()">
+              <span class="slider"></span>
+            </label>
+          </div>
+        </div>
+        <button @click="deleteSection(activeSection)" class="w-full mt-3 btn-danger text-xs py-2">
+          <i class="fas fa-trash"></i> Delete Section
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Add New Section Modal -->
+<div x-show="showAddSectionModal" x-cloak class="modal-overlay" @click.self="showAddSectionModal = false">
+  <div class="modal-box" style="max-width: 700px;">
+    <div class="p-6 border-b border-gray-200 flex items-center justify-between">
+      <div>
+        <h3 class="text-lg font-bold text-gray-900">Add New Section</h3>
+        <p class="text-xs text-gray-500 mt-0.5">Choose a layout for your new section</p>
+      </div>
+      <button @click="showAddSectionModal = false" class="text-gray-400 hover:text-gray-600 text-xl">×</button>
+    </div>
+    <div class="p-6">
+      <div class="grid grid-cols-3 gap-4">
+        <template x-for="layout in sectionLayouts" :key="layout.key">
+          <div
+            class="border-2 rounded-xl p-4 cursor-pointer transition-all"
+            :class="newSectionLayout === layout.key ? 'border-gold bg-amber-50' : 'border-gray-200 hover:border-gray-300'"
+            @click="newSectionLayout = layout.key; newSectionData.sectionType = layout.key"
+          >
+            <div class="h-16 bg-gray-100 rounded-lg mb-3 flex items-center justify-center text-gray-400 text-2xl" x-text="layout.icon"></div>
+            <p class="text-xs font-semibold text-gray-700 text-center" x-text="layout.label"></p>
+            <p class="text-xs text-gray-400 text-center mt-0.5" x-text="layout.description"></p>
+          </div>
+        </template>
+      </div>
+      <div class="mt-6 space-y-3">
+        <div>
+          <label class="field-label">Section Label</label>
+          <input type="text" class="field-input" x-model="newSectionData.label" placeholder="e.g. Hero Banner">
+        </div>
+        <div>
+          <label class="field-label">Description (optional)</label>
+          <input type="text" class="field-input" x-model="newSectionData.description" placeholder="e.g. Full-width hero with two CTA buttons">
+        </div>
+      </div>
+      <div class="flex items-center justify-end gap-3 mt-6">
+        <button @click="showAddSectionModal = false" class="btn-outline">Cancel</button>
+        <button @click="createNewSection()" class="btn-primary" :disabled="!newSectionData.label || !newSectionLayout">
+          <i class="fas fa-plus"></i> Add Section
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Media Library Modal -->
+<div x-show="showMediaModal" x-cloak class="modal-overlay" @click.self="showMediaModal = false">
+  <div class="modal-box" style="max-width: 900px;">
+    <div class="p-5 border-b border-gray-200 flex items-center justify-between">
+      <h3 class="text-base font-bold text-gray-900">Media Library</h3>
+      <div class="flex items-center gap-3">
+        <label class="btn-primary cursor-pointer text-sm">
+          <i class="fas fa-upload"></i> Upload Media
+          <input type="file" class="hidden" accept="image/*,video/*" @change="uploadMedia($event)" multiple>
+        </label>
+        <button @click="showMediaModal = false" class="text-gray-400 hover:text-gray-600 text-xl">×</button>
+      </div>
+    </div>
+    <div class="p-5">
+      <div class="flex items-center gap-4 mb-4">
+        <input type="text" class="field-input" x-model="mediaSearch" placeholder="Search files…" style="max-width: 240px" @input="filterMedia()">
+        <select class="field-input" x-model="mediaTypeFilter" style="max-width: 120px" @change="filterMedia()">
+          <option value="">All Types</option>
+          <option value="image">Images</option>
+          <option value="video">Videos</option>
+        </select>
+        <select class="field-input" x-model="mediaSortBy" style="max-width: 140px" @change="filterMedia()">
+          <option value="newest">Newest</option>
+          <option value="oldest">Oldest</option>
+          <option value="name">Name</option>
+        </select>
+      </div>
+      <!-- Grid view -->
+      <div class="grid grid-cols-5 gap-3 max-h-96 overflow-y-auto">
+        <template x-for="item in filteredMedia" :key="item.id">
+          <div class="relative group cursor-pointer rounded-lg overflow-hidden border-2 border-transparent hover:border-gold transition-colors" @click="selectMedia(item)">
+            <img :src="item.url" class="w-full aspect-square object-cover">
+            <div class="absolute inset-0 bg-black bg-opacity-40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+              <i class="fas fa-check-circle text-white text-xl"></i>
+            </div>
+            <p class="text-xs text-gray-500 mt-1 truncate px-1" x-text="item.name"></p>
+          </div>
+        </template>
+        <div x-show="filteredMedia.length === 0" class="col-span-5 text-center py-12 text-gray-400">
+          <i class="fas fa-images text-4xl mb-2 opacity-30"></i>
+          <p class="text-sm">No media found. Upload some images first.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const API = 'http://localhost:4000/api/v1'
+const TENANT = '00000000-0000-0000-0000-000000000001'
+
+function cmsApp() {
+  return {
+    // Auth
+    isLoggedIn: false,
+    token: '',
+    loginForm: { email: 'admin@rjhouse.com', password: '' },
+    loginLoading: false,
+    loginError: '',
+
+    // Pages
+    pages: [
+      { slug: 'homepage', label: 'Homepage' },
+      { slug: 'about-us', label: 'About Us' },
+      { slug: 'product-page', label: 'Product Page' },
+      { slug: 'collection-page', label: 'Collection Page' },
+      { slug: 'customize', label: 'Customize' },
+      { slug: 'privacy-policy', label: 'Privacy Policy' },
+      { slug: 'return-policy', label: 'Return Policy' },
+      { slug: 'education-page', label: 'Education Page' },
+      { slug: 'blogs', label: 'Blogs' },
+    ],
+    selectedPage: null,
+    currentPageSlug: 'homepage',
+    pageIsPublished: true,
+    lastUpdated: new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }),
+
+    // Sections
+    sections: [],
+    activeSection: null,
+    editContent: {},
+    originalContent: {},
+    loadingSections: false,
+    saving: false,
+
+    // Add Section Modal
+    showAddSectionModal: false,
+    newSectionLayout: '',
+    newSectionData: { label: '', description: '', sectionKey: '', sectionType: '' },
+    sectionLayouts: [
+      { key: 'hero', label: 'Hero Banner', description: 'Full-width banner with CTA', icon: '🖼️' },
+      { key: 'four-column', label: 'Featured Collection', description: 'Four column grid', icon: '⊞' },
+      { key: 'text-only', label: 'Text Section', description: 'Text only section', icon: '📝' },
+      { key: 'banner-video', label: 'Banner + Video', description: 'Image/video with text', icon: '🎬' },
+      { key: 'input-social', label: 'Newsletter', description: 'Input with social links', icon: '📧' },
+      { key: 'informative', label: 'Informative', description: 'Multi-column info', icon: '📋' },
+    ],
+
+    // Media Library
+    showMediaModal: false,
+    mediaTarget: null,
+    mediaBannerIdx: null,
+    mediaList: [],
+    filteredMedia: [],
+    mediaSearch: '',
+    mediaTypeFilter: '',
+    mediaSortBy: 'newest',
+    uploadingMedia: false,
+
+    // Toast
+    toast: { show: false, message: '', type: 'success' },
+
+    async init() {
+      const savedToken = localStorage.getItem('cms_token')
+      if (savedToken) {
+        this.token = savedToken
+        this.isLoggedIn = true
+        await this.selectPage(this.pages[0])
+        await this.loadMedia()
+      }
+    },
+
+    async login() {
+      this.loginLoading = true
+      this.loginError = ''
+      try {
+        const res = await fetch(`${API}/auth/login`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'x-tenant-id': TENANT },
+          body: JSON.stringify(this.loginForm)
+        })
+        const data = await res.json()
+        if (!res.ok) throw new Error(data.message || 'Login failed')
+        const d = data.data || data
+        this.token = d.accessToken || d.access_token
+        localStorage.setItem('cms_token', this.token)
+        this.isLoggedIn = true
+        await this.selectPage(this.pages[0])
+        await this.loadMedia()
+        this.showToast('Welcome back!', 'success')
+      } catch (e) {
+        this.loginError = e.message
+      } finally {
+        this.loginLoading = false
+      }
+    },
+
+    logout() {
+      localStorage.removeItem('cms_token')
+      this.token = ''
+      this.isLoggedIn = false
+      this.sections = []
+      this.activeSection = null
+    },
+
+    async apiCall(method, path, body) {
+      const res = await fetch(`${API}${path}`, {
+        method,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${this.token}`,
+          'x-tenant-id': TENANT
+        },
+        body: body ? JSON.stringify(body) : undefined
+      })
+      if (res.status === 204) return null
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.message || 'API error')
+      return data.data !== undefined ? data.data : data
+    },
+
+    async selectPage(page) {
+      this.selectedPage = page
+      this.currentPageSlug = page.slug
+      this.activeSection = null
+      this.editContent = {}
+      this.loadingSections = true
+      try {
+        let secs = await this.apiCall('GET', `/cms/sections?pageSlug=${page.slug}`)
+        if (!Array.isArray(secs)) secs = []
+        if (secs.length === 0) {
+          secs = await this.apiCall('POST', '/cms/sections/seed', { pageSlug: page.slug })
+          if (!Array.isArray(secs)) secs = []
+        }
+        this.sections = secs
+        if (this.sections.length > 0) {
+          await this.selectSection(this.sections[0])
+        }
+        this.initSortable()
+      } catch (e) {
+        this.sections = []
+      } finally {
+        this.loadingSections = false
+      }
+    },
+
+    async changePage(slug) {
+      const page = this.pages.find(p => p.slug === slug)
+      if (page) await this.selectPage(page)
+    },
+
+    selectSection(section) {
+      this.activeSection = section
+      this.editContent = JSON.parse(JSON.stringify(section.content || {}))
+      this.originalContent = JSON.parse(JSON.stringify(section.content || {}))
+      // Fix banner link paths for display
+      if (this.editContent.banners) {
+        this.editContent.banners = this.editContent.banners.map(b => ({
+          ...b,
+          linkPath: (b.link || '').replace(/^\//, '')
+        }))
+      }
+      if (!this.editContent.bottomBar) {
+        this.editContent.bottomBar = { copyright: '', links: [] }
+      }
+      if (!this.editContent.button) {
+        this.editContent.button = { text: '', link: '', style: 'primary', color: '#c8a96e', textColor: '#ffffff' }
+      }
+    },
+
+    resetSection() {
+      this.editContent = JSON.parse(JSON.stringify(this.originalContent))
+    },
+
+    async saveCurrentSection() {
+      if (!this.activeSection) return
+      this.saving = true
+      try {
+        const updated = await this.apiCall('PUT', `/cms/sections/${this.activeSection.id}`, {
+          content: this.editContent,
+          label: this.activeSection.label,
+          description: this.activeSection.description,
+          isPublished: this.activeSection.isPublished,
+        })
+        const idx = this.sections.findIndex(s => s.id === this.activeSection.id)
+        if (idx >= 0) this.sections[idx] = { ...this.sections[idx], ...updated }
+        this.originalContent = JSON.parse(JSON.stringify(this.editContent))
+        this.showToast('Section saved successfully!', 'success')
+      } catch (e) {
+        this.showToast('Failed to save: ' + e.message, 'error')
+      } finally {
+        this.saving = false
+      }
+    },
+
+    async updateSectionVisibility() {
+      if (!this.activeSection) return
+      try {
+        await this.apiCall('PUT', `/cms/sections/${this.activeSection.id}`, {
+          isPublished: this.activeSection.isPublished,
+          content: this.editContent,
+        })
+        this.showToast(this.activeSection.isPublished ? 'Section visible' : 'Section hidden', 'success')
+      } catch (e) {
+        this.showToast('Update failed', 'error')
+      }
+    },
+
+    async deleteSection(section) {
+      if (!confirm(`Delete "${section.label || section.sectionKey}"? This cannot be undone.`)) return
+      try {
+        await this.apiCall('DELETE', `/cms/sections/${section.id}`)
+        this.sections = this.sections.filter(s => s.id !== section.id)
+        if (this.activeSection?.id === section.id) {
+          this.activeSection = null
+          this.editContent = {}
+        }
+        this.showToast('Section deleted', 'success')
+      } catch (e) {
+        this.showToast('Delete failed: ' + e.message, 'error')
+      }
+    },
+
+    addNewSection() {
+      this.newSectionLayout = ''
+      this.newSectionData = { label: '', description: '', sectionKey: '', sectionType: '' }
+      this.showAddSectionModal = true
+    },
+
+    async createNewSection() {
+      if (!this.newSectionData.label || !this.newSectionLayout) return
+      const key = this.newSectionData.label.toLowerCase().replace(/\s+/g, '-')
+      try {
+        const section = await this.apiCall('POST', '/cms/sections', {
+          pageSlug: this.selectedPage.slug,
+          sectionKey: key,
+          sectionType: this.newSectionLayout,
+          label: this.newSectionData.label,
+          description: this.newSectionData.description,
+          sortOrder: this.sections.length,
+          isPublished: true,
+          content: { heading: this.newSectionData.label, subHeading: '' },
+        })
+        this.sections.push(section)
+        this.showAddSectionModal = false
+        await this.selectSection(section)
+        this.showToast('Section added!', 'success')
+      } catch (e) {
+        this.showToast('Failed to add section: ' + e.message, 'error')
+      }
+    },
+
+    addBanner() {
+      if (!this.editContent.banners) this.editContent.banners = []
+      this.editContent.banners.push({ imageUrl: '', text: '', link: '/', linkPath: '', openInNewTab: false })
+    },
+
+    async togglePageStatus() {
+      try {
+        await this.apiCall('PATCH', `/cms/pages/${this.selectedPage.slug}/status`)
+        this.pageIsPublished = !this.pageIsPublished
+        this.showToast(this.pageIsPublished ? 'Page published!' : 'Page unpublished', 'success')
+      } catch (e) {
+        this.showToast('Status update failed', 'error')
+      }
+    },
+
+    initSortable() {
+      const el = this.$refs?.sectionsList
+      if (!el || typeof Sortable === 'undefined') return
+      if (el._sortable) el._sortable.destroy()
+      el._sortable = new Sortable(el, {
+        animation: 150,
+        handle: '.drag-handle',
+        onEnd: async (evt) => {
+          const orderedIds = [...el.querySelectorAll('[data-id]')].map(e => e.dataset.id)
+          try {
+            await this.apiCall('POST', '/cms/sections/reorder', {
+              pageSlug: this.selectedPage.slug,
+              orderedIds
+            })
+          } catch (e) { /* ignore reorder failure */ }
+        }
+      })
+    },
+
+    // Media Library
+    async loadMedia() {
+      try {
+        const res = await this.apiCall('GET', '/media?limit=100')
+        const items = Array.isArray(res) ? res : (res?.data || [])
+        this.mediaList = items.map(m => ({
+          id: m.id || m.key,
+          name: m.originalName || m.key || 'image',
+          url: m.url || m.signedUrl || '',
+          type: m.mimeType?.startsWith('video') ? 'video' : 'image',
+          size: m.size || 0,
+          uploadedAt: m.createdAt || new Date().toISOString(),
+        }))
+        this.filteredMedia = [...this.mediaList]
+      } catch {
+        this.mediaList = []
+        this.filteredMedia = []
+      }
+    },
+
+    filterMedia() {
+      let list = [...this.mediaList]
+      if (this.mediaSearch) {
+        const s = this.mediaSearch.toLowerCase()
+        list = list.filter(m => m.name.toLowerCase().includes(s))
+      }
+      if (this.mediaTypeFilter) {
+        list = list.filter(m => m.type === this.mediaTypeFilter)
+      }
+      if (this.mediaSortBy === 'oldest') {
+        list.sort((a, b) => new Date(a.uploadedAt) - new Date(b.uploadedAt))
+      } else if (this.mediaSortBy === 'name') {
+        list.sort((a, b) => a.name.localeCompare(b.name))
+      } else {
+        list.sort((a, b) => new Date(b.uploadedAt) - new Date(a.uploadedAt))
+      }
+      this.filteredMedia = list
+    },
+
+    openMediaLibrary() {
+      this.mediaTarget = null
+      this.mediaBannerIdx = null
+      this.showMediaModal = true
+      this.filterMedia()
+    },
+
+    openMediaPicker(field) {
+      this.mediaTarget = field
+      this.mediaBannerIdx = null
+      this.showMediaModal = true
+      this.filterMedia()
+    },
+
+    openMediaPickerForBanner(idx, field) {
+      this.mediaTarget = field
+      this.mediaBannerIdx = idx
+      this.showMediaModal = true
+      this.filterMedia()
+    },
+
+    openMediaPickerForReview(idx) {
+      this.mediaTarget = 'imageUrl'
+      this.mediaBannerIdx = { type: 'review', idx }
+      this.showMediaModal = true
+      this.filterMedia()
+    },
+
+    selectMedia(item) {
+      if (this.mediaBannerIdx !== null) {
+        if (typeof this.mediaBannerIdx === 'object' && this.mediaBannerIdx.type === 'review') {
+          if (!this.editContent.reviews) this.editContent.reviews = []
+          this.editContent.reviews[this.mediaBannerIdx.idx].imageUrl = item.url
+        } else if (typeof this.mediaBannerIdx === 'number') {
+          if (!this.editContent.banners) this.editContent.banners = []
+          this.editContent.banners[this.mediaBannerIdx][this.mediaTarget] = item.url
+        }
+      } else if (this.mediaTarget) {
+        this.editContent[this.mediaTarget] = item.url
+      }
+      this.showMediaModal = false
+      this.mediaTarget = null
+      this.mediaBannerIdx = null
+    },
+
+    async uploadMedia(event) {
+      const files = event.target.files
+      if (!files.length) return
+      this.uploadingMedia = true
+      try {
+        for (const file of files) {
+          const formData = new FormData()
+          formData.append('file', file)
+          formData.append('folder', 'cms')
+          const res = await fetch(`${API}/media/upload`, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${this.token}`, 'x-tenant-id': TENANT },
+            body: formData
+          })
+          const data = await res.json()
+          const m = data.data || data
+          this.mediaList.unshift({
+            id: m.id || m.key || Date.now(),
+            name: file.name,
+            url: m.url || m.signedUrl || URL.createObjectURL(file),
+            type: file.type.startsWith('video') ? 'video' : 'image',
+            size: file.size,
+            uploadedAt: new Date().toISOString(),
+          })
+        }
+        this.filterMedia()
+        this.showToast(`${files.length} file(s) uploaded!`, 'success')
+      } catch (e) {
+        this.showToast('Upload failed: ' + e.message, 'error')
+      } finally {
+        this.uploadingMedia = false
+      }
+    },
+
+    goBack() {
+      window.location.href = '/api/docs'
+    },
+
+    showToast(message, type = 'success') {
+      this.toast = { show: true, message, type }
+      setTimeout(() => { this.toast.show = false }, 3000)
+    },
+  }
+}
+</script>
+</body>
+</html>

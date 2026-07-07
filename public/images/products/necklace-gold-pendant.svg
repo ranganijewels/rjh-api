@@ -1,0 +1,91 @@
+<svg viewBox="0 0 400 400" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <radialGradient id="bg2" cx="50%" cy="30%" r="70%">
+      <stop offset="0%" stop-color="#1a1510"/>
+      <stop offset="100%" stop-color="#0a0806"/>
+    </radialGradient>
+    <linearGradient id="chain" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#7a5a00"/>
+      <stop offset="30%" stop-color="#ffe566"/>
+      <stop offset="60%" stop-color="#c8a020"/>
+      <stop offset="100%" stop-color="#7a5a00"/>
+    </linearGradient>
+    <radialGradient id="pendantGold" cx="35%" cy="25%" r="70%">
+      <stop offset="0%" stop-color="#ffe566"/>
+      <stop offset="50%" stop-color="#c8a020"/>
+      <stop offset="100%" stop-color="#5a3800"/>
+    </radialGradient>
+    <radialGradient id="emerald" cx="30%" cy="25%" r="70%">
+      <stop offset="0%" stop-color="#80ffb0"/>
+      <stop offset="40%" stop-color="#20c060"/>
+      <stop offset="100%" stop-color="#004020"/>
+    </radialGradient>
+    <filter id="glow2">
+      <feGaussianBlur stdDeviation="4" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <rect width="400" height="400" fill="url(#bg2)"/>
+
+  <!-- Chain left side -->
+  <path d="M 80 60 Q 70 120 100 180 Q 120 220 150 240" fill="none" stroke="url(#chain)" stroke-width="4" stroke-linecap="round"/>
+  <!-- Chain right side -->
+  <path d="M 320 60 Q 330 120 300 180 Q 280 220 250 240" fill="none" stroke="url(#chain)" stroke-width="4" stroke-linecap="round"/>
+
+  <!-- Chain links detail left -->
+  <g stroke="#c8a020" stroke-width="2" fill="none">
+    <ellipse cx="80" cy="60" rx="6" ry="3" transform="rotate(-10,80,60)"/>
+    <ellipse cx="78" cy="75" rx="6" ry="3" transform="rotate(-15,78,75)"/>
+    <ellipse cx="82" cy="90" rx="6" ry="3" transform="rotate(-12,82,90)"/>
+    <ellipse cx="84" cy="106" rx="6" ry="3" transform="rotate(-8,84,106)"/>
+    <ellipse cx="90" cy="122" rx="6" ry="3" transform="rotate(-5,90,122)"/>
+    <ellipse cx="98" cy="137" rx="6" ry="3" transform="rotate(0,98,137)"/>
+    <ellipse cx="108" cy="151" rx="6" ry="3" transform="rotate(5,108,151)"/>
+    <ellipse cx="120" cy="164" rx="6" ry="3" transform="rotate(10,120,164)"/>
+    <ellipse cx="133" cy="176" rx="6" ry="3" transform="rotate(15,133,176)"/>
+    <ellipse cx="150" cy="187" rx="6" ry="3" transform="rotate(20,150,187)"/>
+  </g>
+  <!-- Chain links detail right -->
+  <g stroke="#c8a020" stroke-width="2" fill="none">
+    <ellipse cx="320" cy="60" rx="6" ry="3" transform="rotate(10,320,60)"/>
+    <ellipse cx="322" cy="75" rx="6" ry="3" transform="rotate(15,322,75)"/>
+    <ellipse cx="318" cy="90" rx="6" ry="3" transform="rotate(12,318,90)"/>
+    <ellipse cx="316" cy="106" rx="6" ry="3" transform="rotate(8,316,106)"/>
+    <ellipse cx="310" cy="122" rx="6" ry="3" transform="rotate(5,310,122)"/>
+    <ellipse cx="302" cy="137" rx="6" ry="3" transform="rotate(0,302,137)"/>
+    <ellipse cx="292" cy="151" rx="6" ry="3" transform="rotate(-5,292,151)"/>
+    <ellipse cx="280" cy="164" rx="6" ry="3" transform="rotate(-10,280,164)"/>
+    <ellipse cx="267" cy="176" rx="6" ry="3" transform="rotate(-15,267,176)"/>
+    <ellipse cx="250" cy="187" rx="6" ry="3" transform="rotate(-20,250,187)"/>
+  </g>
+
+  <!-- Pendant body - floral design -->
+  <circle cx="200" cy="270" r="55" fill="url(#pendantGold)" filter="url(#glow2)"/>
+  <!-- Petal details -->
+  <ellipse cx="200" cy="225" rx="18" ry="28" fill="#ffe566" opacity="0.7"/>
+  <ellipse cx="200" cy="315" rx="18" ry="28" fill="#ffe566" opacity="0.7"/>
+  <ellipse cx="155" cy="270" rx="28" ry="18" fill="#ffe566" opacity="0.7"/>
+  <ellipse cx="245" cy="270" rx="28" ry="18" fill="#ffe566" opacity="0.7"/>
+  <ellipse cx="163" cy="233" rx="18" ry="12" fill="#c8a020" opacity="0.6" transform="rotate(-45,163,233)"/>
+  <ellipse cx="237" cy="233" rx="18" ry="12" fill="#c8a020" opacity="0.6" transform="rotate(45,237,233)"/>
+  <ellipse cx="163" cy="307" rx="18" ry="12" fill="#c8a020" opacity="0.6" transform="rotate(45,163,307)"/>
+  <ellipse cx="237" cy="307" rx="18" ry="12" fill="#c8a020" opacity="0.6" transform="rotate(-45,237,307)"/>
+  <!-- Center gemstone -->
+  <circle cx="200" cy="270" r="22" fill="url(#emerald)" filter="url(#glow2)"/>
+  <circle cx="200" cy="270" r="14" fill="#40e080" opacity="0.5"/>
+  <circle cx="194" cy="263" r="5" fill="white" opacity="0.6"/>
+  <!-- Pendant bail -->
+  <rect x="192" y="208" width="16" height="20" rx="4" fill="#c8a020"/>
+  <rect x="195" y="205" width="10" height="8" rx="3" fill="none" stroke="#ffe566" stroke-width="2.5"/>
+
+  <!-- Connecting chain -->
+  <path d="M 150 240 Q 175 255 192 228" fill="none" stroke="url(#chain)" stroke-width="4"/>
+  <path d="M 250 240 Q 225 255 208 228" fill="none" stroke="url(#chain)" stroke-width="4"/>
+
+  <!-- Glow effect at top clasp area -->
+  <ellipse cx="200" cy="60" rx="15" ry="8" fill="#c8a020" opacity="0.4"/>
+  <rect x="193" y="55" width="14" height="12" rx="3" fill="#c8a020"/>
+
+  <text x="200" y="362" text-anchor="middle" font-family="Georgia, serif" font-size="16" fill="#c8a020" letter-spacing="3">RJ HOUSE</text>
+  <text x="200" y="382" text-anchor="middle" font-family="Georgia, serif" font-size="11" fill="#888" letter-spacing="1">GOLD EMERALD PENDANT</text>
+</svg>
