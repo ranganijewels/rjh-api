@@ -1,0 +1,36 @@
+name: Deploy api to VPS
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-api
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup SSH key
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+        run: |
+          mkdir -p ~/.ssh
+          echo "$DEPLOY_SSH_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -H 177.7.58.193 >> ~/.ssh/known_hosts 2>/dev/null || true
+
+      - name: Rsync source to VPS
+        run: |
+          rsync -az --delete \
+            --exclude '.git' --exclude 'node_modules' --exclude '.next' --exclude 'dist' \
+            --exclude '.env' --exclude '.env.*' --exclude 'public/uploads' \
+            -e "ssh -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=no" \
+            ./ root@177.7.58.193:/var/www/rangani/api/
+
+      - name: Build and restart on VPS
+        run: ssh -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=no root@177.7.58.193 "/root/deploy.sh api"
