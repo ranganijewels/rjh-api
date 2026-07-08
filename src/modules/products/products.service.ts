@@ -152,19 +152,63 @@ export class ProductsService {
     return product
   }
 
+  // Design group auto-derives from the DESIGN NUMBER (productCode): the code
+  // minus its trailing numeric suffix, so "NIRVANA-003" and "NIRVANA-007" link
+  // as group "NIRVANA". Products without a design number fall back to the
+  // leading words of the product name (before the carat token).
+  static deriveDesignGroup(designNo?: string, productName?: string): string {
+    const clean = (s: string) =>
+      s
+        .normalize('NFD')
+        .replace(/[̀-ͯ]/g, '')
+        .toUpperCase()
+        .replace(/[^A-Z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '')
+        .slice(0, 40)
+    const code = (designNo || '').trim()
+    if (code) {
+      // Strip a trailing run of digits (with optional separator): "RJ-RING-01" → "RJ-RING"
+      const base = code.replace(/[-_ ]*\d+$/g, '').trim()
+      const derived = clean(base || code)
+      if (derived) return derived
+    }
+    const name = (productName || '').trim()
+    if (!name) return ''
+    const norm = name.normalize('NFD').replace(/[̀-ͯ]/g, '')
+    const m = norm.match(/^(.*?)(?=\s+(?:\d|[¼½¾⅓⅔⅕⅖⅗⅘⅙⅚⅛⅜⅝⅞]))/u)
+    return clean(m ? m[1] : norm.split(/\s+/).slice(0, 2).join(' '))
+  }
+
+  private withDerivedDesignGroup(
+    metadata: Record<string, any> | undefined,
+    productCode?: string,
+    productName?: string,
+  ): Record<string, any> {
+    const md = { ...(metadata || {}) }
+    const derived = ProductsService.deriveDesignGroup(productCode, productName)
+    if (derived) md.designGroup = derived
+    return md
+  }
+
   async create(
     tenantId: string,
     dto: CreateProductDto,
     userId: string,
   ): Promise<Product> {
+    const productCode = dto.productCode || `PROD-${Date.now()}`
     const product = this.productRepo.create({
       ...dto,
       tenantId,
       createdBy: userId,
-      productCode: dto.productCode || `PROD-${Date.now()}`,
+      productCode,
       // Resolve ERP aliases: product_status→status, gold_purity→metalPurity
       status: dto.status || (dto as any).productStatus || 'active',
       metalPurity: dto.metalPurity || (dto as any).goldPurity,
+      metadata: this.withDerivedDesignGroup(
+        (dto as any).metadata,
+        dto.productCode,
+        (dto as any).productName,
+      ),
     })
     const saved = await this.productRepo.save(product)
     await this.indexToElasticsearch(saved)
@@ -179,6 +223,13 @@ export class ProductsService {
   ): Promise<Product> {
     const product = await this.findOne(tenantId, id)
     Object.assign(product, dto)
+    // Re-derive from the (possibly updated) design number / name so the group
+    // always tracks the design number — no manual field anywhere.
+    product.metadata = this.withDerivedDesignGroup(
+      product.metadata,
+      product.productCode,
+      (product as any).productName,
+    )
     const saved = await this.productRepo.save(product)
     await this.indexToElasticsearch(saved)
     return saved

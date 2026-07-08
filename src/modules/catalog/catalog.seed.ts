@@ -23,16 +23,20 @@ const SEEDS: Seed[] = [
   { kind: 'metal_type', code: 'GOLD', name: 'Gold', sortOrder: 1 },
   { kind: 'metal_type', code: 'SILVER', name: 'Silver', sortOrder: 2 },
   { kind: 'metal_type', code: 'PLATINUM', name: 'Platinum', sortOrder: 3 },
-  // Metal purities (metadata.applicableMetals drives the configurator)
-  { kind: 'metal_purity', code: '24K', name: '24K', sortOrder: 1, metadata: { applicableMetals: ['GOLD'] } },
-  { kind: 'metal_purity', code: '22K', name: '22K', sortOrder: 2, metadata: { applicableMetals: ['GOLD'] } },
-  { kind: 'metal_purity', code: '18K', name: '18K', sortOrder: 3, metadata: { applicableMetals: ['GOLD'] } },
-  { kind: 'metal_purity', code: '14K', name: '14K', sortOrder: 4, metadata: { applicableMetals: ['GOLD'] } },
-  { kind: 'metal_purity', code: '999', name: '999 (Fine Silver)', sortOrder: 5, metadata: { applicableMetals: ['SILVER'] } },
-  { kind: 'metal_purity', code: '925', name: '925 (Sterling)', sortOrder: 6, metadata: { applicableMetals: ['SILVER'] } },
-  { kind: 'metal_purity', code: '800', name: '800', sortOrder: 7, metadata: { applicableMetals: ['SILVER'] } },
-  { kind: 'metal_purity', code: '950', name: '950 Platinum', sortOrder: 8, metadata: { applicableMetals: ['PLATINUM'] } },
-  { kind: 'metal_purity', code: '900', name: '900 Platinum', sortOrder: 9, metadata: { applicableMetals: ['PLATINUM'] } },
+  // Metal purities (metadata.applicableMetals drives the configurator).
+  // metadata.pricingFactor drives DERIVED gold pricing: admin enters only the
+  // 24K rate; each karat prices at 24K × pricingFactor / 99.9
+  // (18K = ×78/99.9, 14K = ×60/99.9, 10K = ×43/99.9).
+  { kind: 'metal_purity', code: '24K', name: '24K', sortOrder: 1, metadata: { applicableMetals: ['GOLD'], pricingFactor: 99.9 } },
+  { kind: 'metal_purity', code: '22K', name: '22K', sortOrder: 2, metadata: { applicableMetals: ['GOLD'], pricingFactor: 91.6 } },
+  { kind: 'metal_purity', code: '18K', name: '18K', sortOrder: 3, metadata: { applicableMetals: ['GOLD'], pricingFactor: 78 } },
+  { kind: 'metal_purity', code: '14K', name: '14K', sortOrder: 4, metadata: { applicableMetals: ['GOLD'], pricingFactor: 60 } },
+  { kind: 'metal_purity', code: '10K', name: '10K', sortOrder: 5, metadata: { applicableMetals: ['GOLD'], pricingFactor: 43 } },
+  { kind: 'metal_purity', code: '999', name: '999 (Fine Silver)', sortOrder: 6, metadata: { applicableMetals: ['SILVER'] } },
+  { kind: 'metal_purity', code: '925', name: '925 (Sterling)', sortOrder: 7, metadata: { applicableMetals: ['SILVER'] } },
+  { kind: 'metal_purity', code: '800', name: '800', sortOrder: 8, metadata: { applicableMetals: ['SILVER'] } },
+  { kind: 'metal_purity', code: '950', name: '950 Platinum', sortOrder: 9, metadata: { applicableMetals: ['PLATINUM'] } },
+  { kind: 'metal_purity', code: '900', name: '900 Platinum', sortOrder: 10, metadata: { applicableMetals: ['PLATINUM'] } },
   // Metal colors (metadata.hex + applicableMetals)
   { kind: 'metal_color', code: 'WHITE', name: 'White', sortOrder: 1, metadata: { hex: '#E8E8E8', applicableMetals: ['GOLD'] } },
   { kind: 'metal_color', code: 'YELLOW', name: 'Yellow', sortOrder: 2, metadata: { hex: '#E6C200', applicableMetals: ['GOLD'] } },
@@ -66,7 +70,10 @@ export class CatalogSeeder {
 
   async seedDefaults() {
     const count = await this.repo.count({ where: { tenantId: TENANT } })
-    if (count > 0) return
+    if (count > 0) {
+      await this.ensurePricingDefaults()
+      return
+    }
     const rows = SEEDS.map((s) =>
       this.repo.create({
         tenantId: TENANT,
@@ -82,5 +89,38 @@ export class CatalogSeeder {
     )
     await this.repo.save(rows)
     this.logger.log(`Seeded ${rows.length} catalog master values`)
+  }
+
+  // Idempotent upgrade for databases seeded BEFORE derived KT pricing existed:
+  // adds the 10K purity and stamps pricingFactor on gold purities that lack it.
+  // Runs on every boot; no-ops once applied. Admin edits to factors are kept.
+  private async ensurePricingDefaults() {
+    const goldPurities = SEEDS.filter(
+      (s) => s.kind === 'metal_purity' && s.metadata?.pricingFactor != null,
+    )
+    for (const seed of goldPurities) {
+      const row = await this.repo.findOne({
+        where: { tenantId: TENANT, kind: 'metal_purity', code: seed.code },
+      })
+      if (!row) {
+        await this.repo.save(
+          this.repo.create({
+            tenantId: TENANT,
+            kind: seed.kind,
+            code: seed.code,
+            name: seed.name,
+            sortOrder: seed.sortOrder ?? 0,
+            synonyms: [],
+            metadata: seed.metadata || {},
+            status: 'active',
+          }),
+        )
+        this.logger.log(`Added missing metal_purity ${seed.code}`)
+      } else if (row.metadata?.pricingFactor == null) {
+        row.metadata = { ...row.metadata, pricingFactor: seed.metadata!.pricingFactor }
+        await this.repo.save(row)
+        this.logger.log(`Stamped pricingFactor on metal_purity ${seed.code}`)
+      }
+    }
   }
 }

@@ -11,6 +11,7 @@ import { ShippingRate } from '../../database/entities/shipping-rate.entity'
 import { AdditionalCharge } from '../../database/entities/additional-charge.entity'
 import { DiamondMetalWeight } from '../../database/entities/diamond-metal-weight.entity'
 import { PriceBook } from '../../database/entities/price-book.entity'
+import { CatalogMaster } from '../../database/entities/catalog-master.entity'
 
 import { MetalRateService } from './services/metal-rate.service'
 import { DiamondRateService } from './services/diamond-rate.service'
@@ -35,7 +36,7 @@ import { PricingSeeder } from './pricing.seed'
   imports: [
     TypeOrmModule.forFeature([
       Product, MetalRate, DiamondRate, LaborRate, TaxRate, ShippingRate, AdditionalCharge,
-      DiamondMetalWeight, PriceBook,
+      DiamondMetalWeight, PriceBook, CatalogMaster,
     ]),
   ],
   providers: [
