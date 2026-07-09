@@ -22,6 +22,10 @@ CREATE UNIQUE INDEX IF NOT EXISTS "IDX_jeos_collections_tenant_slug"
   ON jeos_collections (tenant_id, slug);
 CREATE INDEX IF NOT EXISTS "IDX_jeos_collections_tenant_status"
   ON jeos_collections (tenant_id, status);
+-- CRITICAL: this file is run as the postgres superuser, so the table is created
+-- owned by postgres. The API connects as the app role (rjhouse) and would get
+-- "permission denied" — hand ownership to the app role.
+ALTER TABLE jeos_collections OWNER TO rjhouse;
 
 -- 2) Seed collection rows from the collection names already on products
 --    (Aurora / Bridal / Engagement / …) so they appear in the manager instantly.

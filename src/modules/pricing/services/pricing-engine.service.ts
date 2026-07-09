@@ -37,6 +37,10 @@ export interface PriceAttributes {
   includeShipping?: boolean
   // Multi-audience pricing — applies a price book's margin/markup/discount.
   priceBookId?: string
+  // Per-product manual overrides (ERP "Labour Rate" / "Design MRP"):
+  // labour amount replaces the labour-master charge; MRP replaces the final price.
+  labourAmountOverride?: number
+  mrpOverride?: number
 }
 
 @Injectable()
@@ -86,6 +90,8 @@ export class PricingEngineService {
       productWeightMatrix: Array.isArray((p.metadata as any)?.weightMatrix)
         ? (p.metadata as any).weightMatrix
         : undefined,
+      labourAmountOverride: Number(p.makingCharge) || 0,
+      mrpOverride: Number((p.metadata as any)?.mrpOverride) || 0,
       ...opts,
     }
     const data = await this.calculate(tenantId, attrs)
@@ -189,7 +195,7 @@ export class PricingEngineService {
     //    percentage → % of (metal + diamond)
     //    per_gram → netWeightG × rate  (labour on net metal weight)
     const baseForLabor = metalValue + diamondValue
-    const { rate: laborRate, amount: laborCharge } = await this.labor.resolve(
+    const { rate: laborRate, amount: laborChargeFromMaster } = await this.labor.resolve(
       tenantId,
       {
         metalType: attrs.metalType,
@@ -201,6 +207,9 @@ export class PricingEngineService {
       baseForLabor,
       asOf,
     )
+    // Per-product flat labour override (product.makingCharge / ERP "Labour Rate").
+    const labourOverride = Number(attrs.labourAmountOverride) || 0
+    const laborCharge = labourOverride > 0 ? labourOverride : laborChargeFromMaster
 
     // 5) Additional charges (% computed on running subtotal)
     const subtotalBeforeAdd = metalValue + diamondValue + gemstoneValue + laborCharge
@@ -251,7 +260,10 @@ export class PricingEngineService {
     // 9) Discounts (optional — usually coupon-applied at cart level)
     const discount = Number(attrs.discount) || 0
 
-    const finalPrice = Math.max(0, subtotal + taxAmount + shippingAmount - discount)
+    const computedFinal = Math.max(0, subtotal + taxAmount + shippingAmount - discount)
+    // Manual Design MRP wins over the computed price when set (> 0).
+    const mrpOverride = Number(attrs.mrpOverride) || 0
+    const finalPrice = mrpOverride > 0 ? mrpOverride : computedFinal
 
     const round = (n: number) => Math.round(n * 100) / 100
 
@@ -268,6 +280,9 @@ export class PricingEngineService {
       shippingAmount: round(shippingAmount),
       discount: round(discount),
       finalPrice: round(finalPrice),
+      computedPrice: round(computedFinal),
+      mrpApplied: mrpOverride > 0,
+      labourOverridden: labourOverride > 0,
       priceBreakdown: {
         weights: {
           netWeightG: round(netWeightG),

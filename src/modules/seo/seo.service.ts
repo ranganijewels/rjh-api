@@ -3,10 +3,12 @@ import { InjectRepository } from '@nestjs/typeorm'
 import { Repository } from 'typeorm'
 import { SeoPage } from '../../database/entities/seo-page.entity'
 import { SeoRedirect } from '../../database/entities/seo-redirect.entity'
+import { PricingEngineService } from '../pricing/services/pricing-engine.service'
 import { Product } from '../../database/entities/product.entity'
 import { CatalogMaster } from '../../database/entities/catalog-master.entity'
 
 const BRAND = 'Rangani Jewelry House'
+const SITE = process.env.SITE_URL || 'https://ranganijewelry.com'
 
 @Injectable()
 export class SeoService {
@@ -17,6 +19,7 @@ export class SeoService {
     private readonly redirects: Repository<SeoRedirect>,
     @InjectRepository(Product)
     private readonly products: Repository<Product>,
+    private readonly pricingEngine: PricingEngineService,
     @InjectRepository(CatalogMaster)
     private readonly masters: Repository<CatalogMaster>,
   ) {}
@@ -149,44 +152,115 @@ export class SeoService {
   async schemaForProduct(tenantId: string, productId: string) {
     const product = await this.products.findOne({
       where: { id: productId, tenantId },
+      relations: ['media'],
     })
     if (!product) throw new NotFoundException('Product not found')
 
-    const images = [product.mainImageUrl].filter(Boolean) as string[]
+    const md: Record<string, any> = (product.metadata as any) || {}
+    const shopping: Record<string, any> = md.shopping || {}
+    const url = `${SITE}/product/${product.id}`
+
+    // Gallery images (main first, unique, capped) so Google/AI see the range.
+    const media = Array.isArray((product as any).media) ? (product as any).media : []
+    const images = [
+      product.mainImageUrl,
+      ...media
+        .filter((m: any) => (m.mediaType || 'image') === 'image')
+        .map((m: any) => m.fileUrl || m.url),
+    ].filter(Boolean)
+    const uniqueImages = [...new Set(images)].slice(0, 10)
+
+    // Live engine price (honors MRP override) — omitted gracefully on failure.
+    let price: number | null = null
+    try {
+      const priced: any = await this.pricingEngine.calculateForProduct(tenantId, product.id)
+      price = Number(priced?.finalPrice) > 0 ? Number(priced.finalPrice) : null
+    } catch {
+      price = null
+    }
+    const priceValidUntil = new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10)
+
+    // Availability: made-to-order jewelry is sellable now → InStock (Google has
+    // no made_to_order value; lead time is communicated via shipping settings).
+    const availability =
+      shopping.availability === 'out_of_stock' || product.status !== 'active'
+        ? 'https://schema.org/OutOfStock'
+        : shopping.availability === 'preorder'
+          ? 'https://schema.org/PreOrder'
+          : 'https://schema.org/InStock'
+
+    const material = [product.metalPurity, product.metalColor, product.metalType]
+      .filter(Boolean)
+      .join(' ')
 
     const schema: Record<string, any> = {
       '@context': 'https://schema.org/',
       '@type': 'Product',
-      name: product.productName,
+      '@id': url,
+      url,
+      name: product.seoTitle || product.productName,
       sku: product.productCode || product.shopifySku || product.id,
+      mpn: product.productCode || product.id,
       description:
-        product.shortDescription
+        product.seoDescription
+        || product.shortDescription
         || product.description
         || product.longDescription
         || product.productName,
-      brand: {
-        '@type': 'Brand',
-        name: BRAND,
-      },
+      brand: { '@type': 'Brand', name: md.brand || BRAND },
+      itemCondition: 'https://schema.org/NewCondition',
       offers: {
         '@type': 'Offer',
+        url,
         priceCurrency: 'USD',
-        availability:
-          product.status === 'active'
-            ? 'https://schema.org/InStock'
-            : 'https://schema.org/OutOfStock',
-        seller: {
-          '@type': 'Organization',
-          name: BRAND,
-        },
+        ...(price != null ? { price: price.toFixed(2), priceValidUntil } : {}),
+        availability,
+        itemCondition: 'https://schema.org/NewCondition',
+        seller: { '@type': 'Organization', name: BRAND },
       },
     }
 
-    if (images.length) schema.image = images
-    if (product.category) schema.category = product.category
+    if (uniqueImages.length) schema.image = uniqueImages
+    if (product.category) schema.category = `Apparel & Accessories > Jewelry > ${product.category}`
+    if (material) schema.material = material
+    if (product.metalColor) schema.color = product.metalColor
+    if (product.ringSize) schema.size = product.ringSize
+    if (product.shopifyTags) schema.keywords = product.shopifyTags
+    if (md.gender) schema.audience = {
+      '@type': 'PeopleAudience',
+      suggestedGender: String(md.gender).toLowerCase(),
+    }
+    // Shape variants of the same design (per-shape sibling products) — lets
+    // Google/AI group them as one product family (item_group_id equivalent).
+    if (md.designGroup) {
+      schema.isVariantOf = {
+        '@type': 'ProductGroup',
+        productGroupID: md.designGroup,
+        name: md.designGroup,
+      }
+    }
+    // Diamond specifics as typed properties (rich AI-readable attributes).
+    const props: Array<Record<string, string>> = []
+    const addProp = (name: string, value: any) => {
+      if (value !== undefined && value !== null && value !== '') {
+        props.push({ '@type': 'PropertyValue', name, value: String(value) } as any)
+      }
+    }
+    addProp('Diamond Shape', product.diamondShape)
+    addProp('Diamond Weight (ct)', product.diamondWeightCt)
+    addProp('Diamond Quality', product.diamondQuality)
+    addProp('Diamond Cut', product.diamondCut)
+    addProp('Diamond Color', product.diamondColor)
+    addProp('Diamond Clarity', product.diamondClarity)
+    addProp('Certification', product.diamondCertLab)
+    addProp('Diamond Type', product.diamondType || 'Lab Grown (CVD)')
+    addProp('Metal', material)
+    addProp('Net Weight (g)', product.netWeightG)
+    if (props.length) schema.additionalProperty = props
 
     return schema
   }
+
 
   // ─── Sitemap ────────────────────────────────────────────────────────────────
 

@@ -19,6 +19,11 @@ const SEEDS: Seed[] = [
   { kind: 'diamond_shape', code: 'RAD', name: 'Radiant', sortOrder: 8, seoSlug: 'radiant', synonyms: ['Radiant Cut'] },
   { kind: 'diamond_shape', code: 'ASC', name: 'Asscher', sortOrder: 9, seoSlug: 'asscher', synonyms: ['Asscher Cut'] },
   { kind: 'diamond_shape', code: 'HRT', name: 'Heart', sortOrder: 10, seoSlug: 'heart', synonyms: ['Heart Cut'] },
+  // Product types (ERP "Select Producttype" dropdown)
+  { kind: 'product_type', code: 'DIAMOND', name: 'Diamond Jewellery', sortOrder: 1 },
+  { kind: 'product_type', code: 'GOLD', name: 'Gold Jewellery', sortOrder: 2 },
+  { kind: 'product_type', code: 'SILVER', name: 'Silver Jewellery', sortOrder: 3 },
+  { kind: 'product_type', code: 'PLATINUM', name: 'Platinum Jewellery', sortOrder: 4 },
   // Metal types
   { kind: 'metal_type', code: 'GOLD', name: 'Gold', sortOrder: 1 },
   { kind: 'metal_type', code: 'SILVER', name: 'Silver', sortOrder: 2 },
@@ -95,6 +100,27 @@ export class CatalogSeeder {
   // adds the 10K purity and stamps pricingFactor on gold purities that lack it.
   // Runs on every boot; no-ops once applied. Admin edits to factors are kept.
   private async ensurePricingDefaults() {
+    // product_type kind didn't exist in earlier installs — add missing rows.
+    for (const seed of SEEDS.filter((x) => x.kind === 'product_type')) {
+      const exists = await this.repo.findOne({
+        where: { tenantId: TENANT, kind: 'product_type', code: seed.code },
+      })
+      if (!exists) {
+        await this.repo.save(
+          this.repo.create({
+            tenantId: TENANT,
+            kind: seed.kind,
+            code: seed.code,
+            name: seed.name,
+            sortOrder: seed.sortOrder ?? 0,
+            synonyms: [],
+            metadata: {},
+            status: 'active',
+          }),
+        )
+        this.logger.log(`Added product_type ${seed.code}`)
+      }
+    }
     const goldPurities = SEEDS.filter(
       (s) => s.kind === 'metal_purity' && s.metadata?.pricingFactor != null,
     )
