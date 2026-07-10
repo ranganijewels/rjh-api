@@ -6,6 +6,7 @@ import { Appointment } from '../../database/entities/appointment.entity'
 import { ContactSubmission } from '../../database/entities/contact-submission.entity'
 import { SubmissionsService } from './submissions.service'
 import { SubmissionsController } from './submissions.controller'
+import { EmailModule } from '../../infrastructure/email/email.module'
 
 @Module({
   imports: [
@@ -15,6 +16,7 @@ import { SubmissionsController } from './submissions.controller'
       Appointment,
       ContactSubmission,
     ]),
+    EmailModule,
   ],
   providers: [SubmissionsService],
   controllers: [SubmissionsController],

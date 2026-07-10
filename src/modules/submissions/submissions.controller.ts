@@ -148,6 +148,17 @@ export class SubmissionsController {
   // ─── Appointments ────────────────────────────────────────────────────────
 
   @Public()
+  @Get('appointments/slots')
+  @ApiOperation({ summary: '30-min consultation slots for a date (public)' })
+  appointmentSlots(
+    @Headers('x-tenant-id') headerTenantId: string,
+    @Query('date') date: string,
+    @Query('tenantId') tenantId?: string,
+  ) {
+    return this.service.appointmentSlots(tenantId || headerTenantId, date)
+  }
+
+  @Public()
   @Post('appointments')
   @ApiOperation({ summary: 'Book an appointment (public)' })
   createAppointment(
@@ -155,7 +166,7 @@ export class SubmissionsController {
     @CurrentUser('tenantId') tenantId: string,
     @Body() dto: any,
   ) {
-    return this.service.create(this.service.appointments, tenantId || headerTenantId, dto)
+    return this.service.bookAppointment(tenantId || headerTenantId, dto)
   }
 
   @Get('appointments')
