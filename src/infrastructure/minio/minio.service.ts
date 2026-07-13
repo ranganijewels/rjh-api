@@ -12,8 +12,17 @@ export class MinioService {
   constructor(private readonly config: ConfigService) {
     this.uploadsDir = path.join(process.cwd(), 'public', 'uploads')
     const port = this.config.get<number>('PORT', 4000)
-    this.publicBaseUrl = `http://localhost:${port}/uploads`
-    this.logger.log(`Local file storage enabled → ${this.uploadsDir}`)
+    // MINIO_PUBLIC_URL predates this local-disk shim (MinIO was replaced with
+    // plain filesystem storage) but is kept as the externally-reachable base
+    // URL — e.g. https://api.ranganijewelry.com in production. The ":9000"
+    // default in .env.example is a leftover MinIO placeholder and must not be
+    // used as a real base, so local dev still falls back to this API's port.
+    const configuredPublicUrl = this.config.get<string>('minio.publicUrl')
+    this.publicBaseUrl =
+      configuredPublicUrl && !configuredPublicUrl.includes(':9000')
+        ? `${configuredPublicUrl.replace(/\/$/, '')}/uploads`
+        : `http://localhost:${port}/uploads`
+    this.logger.log(`Local file storage enabled → ${this.uploadsDir} (public base: ${this.publicBaseUrl})`)
   }
 
   async upload(bucket: string, key: string, buffer: Buffer, _mimetype: string): Promise<string> {
