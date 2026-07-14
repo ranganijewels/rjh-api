@@ -4,7 +4,11 @@ import { memoryStorage } from 'multer'
 import { MediaService } from './media.service'
 import { MediaController } from './media.controller'
 
-const MAX_FILE_SIZE_BYTES = 50 * 1024 * 1024 // 50 MB
+// Must match MediaService.MAX_FILE_SIZE_BYTES — Multer enforces this limit at
+// the HTTP layer before MediaService.uploadFile ever runs, so if the two
+// drift, uploads between the two ceilings are silently rejected here without
+// MediaService's own check ever having a chance to run.
+const MAX_FILE_SIZE_BYTES = 200 * 1024 * 1024 // 200 MB
 
 @Module({
   imports: [
