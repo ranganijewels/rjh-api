@@ -152,62 +152,14 @@ export class ProductsService {
     return product
   }
 
-  // Diamond-shape codes recognized as a trailing suffix, e.g. "LR-001-RND" →
-  // family "LR-001". Mirrors the admin form's client-side hint (and the
-  // seeded diamond_shape catalog master) — kept as a static list here so
-  // deriving a design group never needs an extra DB round trip on save.
-  private static readonly SHAPE_CODES = [
-    'RND', 'OVL', 'PRI', 'EMR', 'EME', 'CUS', 'ELC', 'PEA', 'MAR', 'RAD', 'ASC', 'HRT',
-  ]
-
-  // Design group auto-derives from the DESIGN NUMBER (productCode).
-  // ENTERPRISE convention: a trailing shape-code token is stripped first, so
-  // "LR-001-RND" / "LR-001-OVL" both link as group "LR-001" (this is the
-  // AUTHORITATIVE derivation — it always overwrites whatever the client sent,
-  // see withDerivedDesignGroup below — so it must recognize the same
-  // convention the admin form's UI hint does, or the two silently disagree).
-  // LEGACY fallback: the code minus its trailing NUMERIC suffix, so
-  // "NIRVANA-003" and "NIRVANA-007" link as group "NIRVANA". Products
-  // without a design number fall back to the leading words of the product
-  // name (before the carat token).
-  static deriveDesignGroup(designNo?: string, productName?: string): string {
-    const clean = (s: string) =>
-      s
-        .normalize('NFD')
-        .replace(/[̀-ͯ]/g, '')
-        .toUpperCase()
-        .replace(/[^A-Z0-9]+/g, '-')
-        .replace(/^-+|-+$/g, '')
-        .slice(0, 40)
-    const code = (designNo || '').trim()
-    if (code) {
-      const shapeMatch = code.match(/^(.*?)[-_ ]+([A-Za-z]{2,4})$/)
-      if (shapeMatch && ProductsService.SHAPE_CODES.includes(shapeMatch[2].toUpperCase())) {
-        const fam = clean(shapeMatch[1])
-        if (fam) return fam
-      }
-      // Strip a trailing run of digits (with optional separator): "RJ-RING-01" → "RJ-RING"
-      const base = code.replace(/[-_ ]*\d+$/g, '').trim()
-      const derived = clean(base || code)
-      if (derived) return derived
-    }
-    const name = (productName || '').trim()
-    if (!name) return ''
-    const norm = name.normalize('NFD').replace(/[̀-ͯ]/g, '')
-    const m = norm.match(/^(.*?)(?=\s+(?:\d|[¼½¾⅓⅔⅕⅖⅗⅘⅙⅚⅛⅜⅝⅞]))/u)
-    return clean(m ? m[1] : norm.split(/\s+/).slice(0, 2).join(' '))
-  }
-
-  private withDerivedDesignGroup(
-    metadata: Record<string, any> | undefined,
-    productCode?: string,
-    productName?: string,
-  ): Record<string, any> {
-    const md = { ...(metadata || {}) }
-    const derived = ProductsService.deriveDesignGroup(productCode, productName)
-    if (derived) md.designGroup = derived
-    return md
-  }
+  // Design group (metadata.designGroup) is MANUAL ONLY — set verbatim from
+  // whatever the admin form's "Group" field sends, never auto-derived from
+  // productCode/productName. (Previously this was auto-derived and silently
+  // overwrote any client-provided value on every save — that caused
+  // standalone codes like "LR-001" to be mis-grouped by a legacy
+  // trailing-number strip, e.g. "LR-001" -> "LR". The admin now types the
+  // exact group code they want, e.g. "LR-001" on every shape-variant
+  // sibling, and leaves it blank for a standalone product.)
 
   async create(
     tenantId: string,
@@ -223,11 +175,6 @@ export class ProductsService {
       // Resolve ERP aliases: product_status→status, gold_purity→metalPurity
       status: dto.status || (dto as any).productStatus || 'active',
       metalPurity: dto.metalPurity || (dto as any).goldPurity,
-      metadata: this.withDerivedDesignGroup(
-        (dto as any).metadata,
-        dto.productCode,
-        (dto as any).productName,
-      ),
     })
     const saved = await this.productRepo.save(product)
     await this.indexToElasticsearch(saved)
@@ -242,13 +189,6 @@ export class ProductsService {
   ): Promise<Product> {
     const product = await this.findOne(tenantId, id)
     Object.assign(product, dto)
-    // Re-derive from the (possibly updated) design number / name so the group
-    // always tracks the design number — no manual field anywhere.
-    product.metadata = this.withDerivedDesignGroup(
-      product.metadata,
-      product.productCode,
-      (product as any).productName,
-    )
     const saved = await this.productRepo.save(product)
     await this.indexToElasticsearch(saved)
     return saved
