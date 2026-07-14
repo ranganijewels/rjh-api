@@ -86,6 +86,12 @@ export class PricingEngineService {
       diamondShape: p.diamondShape,
       diamondWeightCt: Number(p.diamondWeightCt) || 0,
       diamondQuality: p.diamondQuality,
+      // Previously missing entirely — any Diamond Rate master row that
+      // requires an exact color/clarity match (rather than a wildcard)
+      // could never match ANY product, since the matcher never received
+      // these two attributes at all.
+      diamondColor: p.diamondColor,
+      diamondClarity: p.diamondClarity,
       category: p.category,
       productWeightMatrix: Array.isArray((p.metadata as any)?.weightMatrix)
         ? (p.metadata as any).weightMatrix
