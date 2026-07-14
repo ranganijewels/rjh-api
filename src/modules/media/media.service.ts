@@ -37,7 +37,7 @@ const ALLOWED_MIMETYPES = [
   'image/x-photoshop',
 ]
 
-const MAX_FILE_SIZE_BYTES = 50 * 1024 * 1024 // 50 MB
+const MAX_FILE_SIZE_BYTES = 200 * 1024 * 1024 // 200 MB (raw phone-shot product videos routinely exceed the old 50 MB cap)
 const IMAGE_MAX_WIDTH = 1920
 const IMAGE_QUALITY = 85
 

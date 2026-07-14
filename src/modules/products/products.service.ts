@@ -152,10 +152,24 @@ export class ProductsService {
     return product
   }
 
-  // Design group auto-derives from the DESIGN NUMBER (productCode): the code
-  // minus its trailing numeric suffix, so "NIRVANA-003" and "NIRVANA-007" link
-  // as group "NIRVANA". Products without a design number fall back to the
-  // leading words of the product name (before the carat token).
+  // Diamond-shape codes recognized as a trailing suffix, e.g. "LR-001-RND" →
+  // family "LR-001". Mirrors the admin form's client-side hint (and the
+  // seeded diamond_shape catalog master) — kept as a static list here so
+  // deriving a design group never needs an extra DB round trip on save.
+  private static readonly SHAPE_CODES = [
+    'RND', 'OVL', 'PRI', 'EMR', 'EME', 'CUS', 'ELC', 'PEA', 'MAR', 'RAD', 'ASC', 'HRT',
+  ]
+
+  // Design group auto-derives from the DESIGN NUMBER (productCode).
+  // ENTERPRISE convention: a trailing shape-code token is stripped first, so
+  // "LR-001-RND" / "LR-001-OVL" both link as group "LR-001" (this is the
+  // AUTHORITATIVE derivation — it always overwrites whatever the client sent,
+  // see withDerivedDesignGroup below — so it must recognize the same
+  // convention the admin form's UI hint does, or the two silently disagree).
+  // LEGACY fallback: the code minus its trailing NUMERIC suffix, so
+  // "NIRVANA-003" and "NIRVANA-007" link as group "NIRVANA". Products
+  // without a design number fall back to the leading words of the product
+  // name (before the carat token).
   static deriveDesignGroup(designNo?: string, productName?: string): string {
     const clean = (s: string) =>
       s
@@ -167,6 +181,11 @@ export class ProductsService {
         .slice(0, 40)
     const code = (designNo || '').trim()
     if (code) {
+      const shapeMatch = code.match(/^(.*?)[-_ ]+([A-Za-z]{2,4})$/)
+      if (shapeMatch && ProductsService.SHAPE_CODES.includes(shapeMatch[2].toUpperCase())) {
+        const fam = clean(shapeMatch[1])
+        if (fam) return fam
+      }
       // Strip a trailing run of digits (with optional separator): "RJ-RING-01" → "RJ-RING"
       const base = code.replace(/[-_ ]*\d+$/g, '').trim()
       const derived = clean(base || code)
