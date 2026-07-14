@@ -19,8 +19,11 @@ export class DiamondRateService extends BaseRateService<DiamondRate> {
   ): Promise<{ rate: DiamondRate | null; perCarat: number }> {
     const rows = await this.repo.find({ where: { tenantId } as any })
     const carat = Number(attrs.carat) || 0
+    // Manually-typed master/product data (Materials BOM rows especially)
+    // routinely carries stray leading/trailing whitespace — e.g. "Emerald "
+    // vs "Emerald" — which silently broke every exact-match comparison here.
     const eq = (a?: string, b?: string) =>
-      !a || (a || '').toLowerCase() === (b || '').toLowerCase()
+      !a || (a || '').trim().toLowerCase() === (b || '').trim().toLowerCase()
 
     const candidates = rows
       .filter((r) => r.status === 'active')
