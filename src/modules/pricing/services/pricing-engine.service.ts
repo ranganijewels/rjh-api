@@ -16,6 +16,10 @@ import { PriceBookService } from './price-book.service'
 export interface PriceAttributes {
   metalType?: string
   metalPurity?: string
+  // The purity the product's stored weight was actually entered at (usually
+  // 14K, matching the Materials metal row) — used as the anchor for the
+  // purity → weight adjustment below. Not overridable via `opts`.
+  baseMetalPurity?: string
   metalColor?: string
   grossWeightG?: number
   netWeightG?: number   // explicit override; normally auto-computed from diamond-metal-weight table
@@ -80,6 +84,7 @@ export class PricingEngineService {
     const attrs: PriceAttributes = {
       metalType: p.metalType,
       metalPurity: p.metalPurity,
+      baseMetalPurity: p.metalPurity,
       metalColor: p.metalColor,
       grossWeightG: Number(p.grossWeightG) || 0,
       netWeightG: Number(p.netWeightG) || 0,
@@ -104,6 +109,24 @@ export class PricingEngineService {
     const result = { productId, sku: p.productCode, productName: p.productName, ...data }
     this.cache.set(cacheKey, { at: Date.now(), data: result })
     return result
+  }
+
+  /**
+   * Casting weight differs by purity (alloy density) even for the same mold.
+   * Weight is entered/stored at one reference purity (baseMetalPurity, usually
+   * 14K). Anchored at 14K = 1.0: 10K = −15%, 18K = +15%, Silver = 10K − 15%
+   * (≈ −27.75% off 14K). Purities outside this set (22K, Platinum, …) are
+   * left unscaled — only these four are defined by the rule.
+   */
+  private purityWeightFactor(purity?: string): number | null {
+    if (!purity) return null
+    const p = purity.trim().toUpperCase()
+    if (p.includes('10K')) return 0.85
+    if (p.includes('14K')) return 1
+    if (p.includes('18K')) return 1.15
+    if (p.includes('SILVER') || p.includes('925') || p.includes('999') || p.includes('800'))
+      return 0.85 * 0.85
+    return null
   }
 
   /**
@@ -157,13 +180,20 @@ export class PricingEngineService {
     )
     const usedMatrix = matrixWeight != null
     const usedMaster = !usedMatrix && explicitNet <= 0 && !!dmwRow
-    const netWeightG = usedMatrix
+    const resolvedWeightG = usedMatrix
       ? matrixWeight
       : explicitNet > 0
       ? explicitNet
       : usedMaster
       ? metalWeightG
       : Number(attrs.grossWeightG) || 0
+    // Scale the resolved (base-purity) weight to the purity actually being
+    // priced — e.g. switching a 14K-entered product to 10K on the storefront
+    // configurator should reduce the metal weight, not just its rate.
+    const baseFactor = this.purityWeightFactor(attrs.baseMetalPurity)
+    const targetFactor = this.purityWeightFactor(attrs.metalPurity)
+    const purityWeightMultiplier = baseFactor && targetFactor ? targetFactor / baseFactor : 1
+    const netWeightG = resolvedWeightG * purityWeightMultiplier
     const hasDerivedWeight = usedMatrix || usedMaster
     const diamondWeightInGrams = carat * 0.2 // 1 carat = 0.2 g
     const grossWeightG = hasDerivedWeight
@@ -298,6 +328,12 @@ export class PricingEngineService {
             matrixWeight != null ? 'product-matrix' : dmwRow ? 'global-master' : 'product-weight',
           metalWeightLookup: !!dmwRow,
           metalWeightRuleId: dmwRow?.id ?? null,
+          // Purity-adjusted weight — resolvedWeightG is the weight at
+          // baseMetalPurity (as entered/stored); netWeightG above is scaled
+          // to attrs.metalPurity via the ±15% purity rule.
+          baseWeightG: round(resolvedWeightG),
+          baseMetalPurity: attrs.baseMetalPurity ?? null,
+          purityWeightMultiplier: round(purityWeightMultiplier),
         },
         metal: {
           netWeightG: round(netWeightG),
