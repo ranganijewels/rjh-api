@@ -22,8 +22,18 @@ export class DiamondRateService extends BaseRateService<DiamondRate> {
     // Manually-typed master/product data (Materials BOM rows especially)
     // routinely carries stray leading/trailing whitespace — e.g. "Emerald "
     // vs "Emerald" — which silently broke every exact-match comparison here.
-    const eq = (a?: string, b?: string) =>
-      !a || (a || '').trim().toLowerCase() === (b || '').trim().toLowerCase()
+    // A master value may also be a comma-separated LIST (admin multi-selected
+    // several qualities for one rate row, e.g. "VVS1,VVS2") — match if the
+    // product's value is ANY of them. A plain single value behaves exactly
+    // as before (a one-item list).
+    const eq = (a?: string, b?: string) => {
+      if (!a) return true
+      const bv = (b || '').trim().toLowerCase()
+      return a
+        .split(',')
+        .map((s) => s.trim().toLowerCase())
+        .includes(bv)
+    }
 
     const candidates = rows
       .filter((r) => r.status === 'active')
