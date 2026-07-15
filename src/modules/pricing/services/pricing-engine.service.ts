@@ -31,6 +31,23 @@ export interface PriceAttributes {
   diamondColor?: string
   diamondClarity?: string
   diamondQuality?: string
+  // Selected/stored CENTRE stone carat — drives the metal-weight matrix and,
+  // when diamondLines are present, overrides the centre line's carat (side
+  // stones keep their own weight).
+  centerCaratCt?: number
+  // Per-line diamond breakdown (centre + side stones). When present, diamond
+  // value is the SUM of each line priced by its OWN shape + carat band —
+  // e.g. Emerald 0.26ct × its rate + Round 0.18ct × its rate — instead of one
+  // total-carat × centre-shape lookup.
+  diamondLines?: Array<{
+    shape?: string
+    carat: number
+    color?: string
+    clarity?: string
+    qualityGrade?: string
+    isCenter?: boolean
+    pcs?: number
+  }>
   category?: string
   // destination for tax/shipping
   country?: string
@@ -81,11 +98,31 @@ export class PricingEngineService {
     const p = await this.productRepo.findOne({ where: { id: productId, tenantId } as any })
     if (!p) throw new NotFoundException(`Product ${productId} not found`)
 
+    // Per-line diamonds from the Materials BOM — each priced by its own
+    // shape + carat band (centre + side stones), summed.
+    const materials = Array.isArray((p.metadata as any)?.materials)
+      ? (p.metadata as any).materials
+      : []
+    const diamondLines = materials
+      .filter((m: any) => String(m?.materialType || '').toLowerCase() === 'diamond')
+      .map((m: any) => ({
+        shape: m.shape,
+        carat: Number(m.wt) || 0,
+        color: m.color,
+        clarity: m.quality,
+        qualityGrade: m.quality,
+        isCenter: !!m.centerStone,
+        pcs: Number(m.pcs) || 0,
+      }))
+      .filter((d: any) => d.carat > 0)
+
     const attrs: PriceAttributes = {
       metalType: p.metalType,
       metalPurity: p.metalPurity,
       baseMetalPurity: p.metalPurity,
       metalColor: p.metalColor,
+      centerCaratCt: Number(p.centerStoneWeightCt) || 0,
+      diamondLines: diamondLines.length ? diamondLines : undefined,
       grossWeightG: Number(p.grossWeightG) || 0,
       netWeightG: Number(p.netWeightG) || 0,
       diamondShape: p.diamondShape,
@@ -155,7 +192,69 @@ export class PricingEngineService {
   // Core formula. Pure function of attributes + master data.
   async calculate(tenantId: string, attrs: PriceAttributes) {
     const asOf = new Date()
-    const carat = Number(attrs.diamondWeightCt) || 0
+    const round = (n: number) => Math.round(n * 100) / 100
+    // CENTRE stone carat drives the metal-weight matrix (a bigger centre needs
+    // more metal for its setting). Prefer the explicit/selected centre carat;
+    // fall back to the total diamondWeightCt for callers that don't split it.
+    const centerCarat = Number(attrs.centerCaratCt) || Number(attrs.diamondWeightCt) || 0
+
+    // ── Diamond value: price EACH line by its OWN shape + carat band, then sum
+    // (centre + side stones). The centre line uses the selected/stored centre
+    // carat; side stones keep their entered weight. Falls back to a single
+    // total-carat × centre-shape lookup when no per-line data is supplied.
+    let diamondValue = 0
+    let totalDiamondCt = 0
+    let anyDiamondMatched = false
+    let firstDiamondRateId: string | null = null
+    const diamondLinesOut: any[] = []
+    if (Array.isArray(attrs.diamondLines) && attrs.diamondLines.length) {
+      for (const ln of attrs.diamondLines) {
+        const lineCt = ln.isCenter
+          ? centerCarat || Number(ln.carat) || 0
+          : Number(ln.carat) || 0
+        if (lineCt <= 0) continue
+        const { rate, perCarat: lpc } = await this.diamond.resolvePerCarat(
+          tenantId,
+          { shape: ln.shape, carat: lineCt, color: ln.color, clarity: ln.clarity, qualityGrade: ln.qualityGrade },
+          asOf,
+        )
+        diamondValue += lineCt * lpc
+        totalDiamondCt += lineCt
+        if (rate) {
+          anyDiamondMatched = true
+          firstDiamondRateId = firstDiamondRateId || rate.id
+        }
+        diamondLinesOut.push({
+          shape: ln.shape || null,
+          isCenter: !!ln.isCenter,
+          caratWeight: round(lineCt),
+          ratePerCarat: round(lpc),
+          value: round(lineCt * lpc),
+          matched: !!rate,
+        })
+      }
+    } else {
+      const c = Number(attrs.diamondWeightCt) || 0
+      const { rate, perCarat: lpc } = await this.diamond.resolvePerCarat(
+        tenantId,
+        { shape: attrs.diamondShape, carat: c, color: attrs.diamondColor, clarity: attrs.diamondClarity, qualityGrade: attrs.diamondQuality },
+        asOf,
+      )
+      diamondValue = c * lpc
+      totalDiamondCt = c
+      anyDiamondMatched = !!rate
+      firstDiamondRateId = rate?.id ?? null
+      if (c > 0)
+        diamondLinesOut.push({
+          shape: attrs.diamondShape || null,
+          isCenter: true,
+          caratWeight: round(c),
+          ratePerCarat: round(lpc),
+          value: round(diamondValue),
+          matched: !!rate,
+        })
+    }
+    const avgPerCarat = totalDiamondCt > 0 ? diamondValue / totalDiamondCt : 0
 
     // ── Weight resolution ─────────────────────────────────────────────────────
     // Priority:
@@ -171,11 +270,11 @@ export class PricingEngineService {
     // master is only a fallback for products that set neither (it is no longer edited
     // from a global screen — size→weight lives in the Add Product "Carat → Metal
     // Weight" table). Order: 1) matrix  2) explicit net  3) global master  4) gross.
-    const matrixWeight = this.resolveMatrixWeight(attrs.productWeightMatrix, carat)
+    const matrixWeight = this.resolveMatrixWeight(attrs.productWeightMatrix, centerCarat)
     const explicitNet = Number(attrs.netWeightG) || 0
     const { row: dmwRow, metalWeightG } = await this.diamondMetalWeight.resolve(
       tenantId,
-      { metalType: attrs.metalType, category: attrs.category, diamondCt: carat },
+      { metalType: attrs.metalType, category: attrs.category, diamondCt: centerCarat },
       asOf,
     )
     const usedMatrix = matrixWeight != null
@@ -195,7 +294,7 @@ export class PricingEngineService {
     const purityWeightMultiplier = baseFactor && targetFactor ? targetFactor / baseFactor : 1
     const netWeightG = resolvedWeightG * purityWeightMultiplier
     const hasDerivedWeight = usedMatrix || usedMaster
-    const diamondWeightInGrams = carat * 0.2 // 1 carat = 0.2 g
+    const diamondWeightInGrams = totalDiamondCt * 0.2 // 1 carat = 0.2 g
     const grossWeightG = hasDerivedWeight
       ? netWeightG + diamondWeightInGrams
       : Number(attrs.grossWeightG) || netWeightG
@@ -209,19 +308,7 @@ export class PricingEngineService {
     )
     const metalValue = netWeightG * perGram
 
-    // 2) Diamond value = carat × per-carat rate
-    const { rate: diamondRate, perCarat } = await this.diamond.resolvePerCarat(
-      tenantId,
-      {
-        shape: attrs.diamondShape,
-        carat,
-        color: attrs.diamondColor,
-        clarity: attrs.diamondClarity,
-        qualityGrade: attrs.diamondQuality,
-      },
-      asOf,
-    )
-    const diamondValue = carat * perCarat
+    // 2) Diamond value already computed per-line above (diamondValue).
 
     // 3) Gemstone value — future (always 0 for now)
     const gemstoneValue = 0
@@ -236,7 +323,7 @@ export class PricingEngineService {
       {
         metalType: attrs.metalType,
         category: attrs.category,
-        carat,
+        carat: totalDiamondCt,
         weightG: grossWeightG,
         netWeightG,
       },
@@ -301,8 +388,6 @@ export class PricingEngineService {
     const mrpOverride = Number(attrs.mrpOverride) || 0
     const finalPrice = mrpOverride > 0 ? mrpOverride : computedFinal
 
-    const round = (n: number) => Math.round(n * 100) / 100
-
     return {
       metalValue: round(metalValue),
       diamondValue: round(diamondValue),
@@ -343,12 +428,15 @@ export class PricingEngineService {
           value: round(metalValue),
         },
         diamond: {
-          caratWeight: carat,
-          ratePerCarat: round(perCarat),
-          rateId: diamondRate?.id ?? null,
-          matched: !!diamondRate,
+          caratWeight: round(totalDiamondCt),
+          ratePerCarat: round(avgPerCarat),
+          rateId: firstDiamondRateId,
+          matched: anyDiamondMatched,
           value: round(diamondValue),
         },
+        // Per-line breakdown (centre + side stones), each priced by its own
+        // shape + carat band. Sums to `diamond.value` above.
+        diamonds: diamondLinesOut,
         labor: {
           type: laborRate?.laborType ?? null,
           rate: laborRate ? Number(laborRate.laborRate) : 0,
@@ -380,7 +468,7 @@ export class PricingEngineService {
         netWeightG <= 0 ? 'Missing metal weight — metal value is $0 (product is underpriced)' : null,
         netWeightG > 0 && metalValue <= 0 ? 'No matching metal rate — metal value is $0' : null,
         !metalRate && netWeightG > 0 ? 'No matching metal rate' : null,
-        !diamondRate && carat > 0 ? 'No matching diamond rate' : null,
+        !anyDiamondMatched && totalDiamondCt > 0 ? 'No matching diamond rate' : null,
         !laborRate ? 'No matching labor rate' : null,
         // NOTE: weight is managed per-product (matrix / net weight), so using the
         // product's own weight is normal — not a warning. Only a genuinely missing
