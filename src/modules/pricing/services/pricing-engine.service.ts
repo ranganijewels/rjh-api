@@ -116,10 +116,21 @@ export class PricingEngineService {
       }))
       .filter((d: any) => d.carat > 0)
 
+    // The metal weight (Materials row + the carat→weight matrix) is entered at
+    // ONE purity: the one stated on the Materials METAL row (e.g. "14K"). That
+    // is the anchor for the ±15% purity-weight rule — NOT product.metalPurity,
+    // which is only the default display purity and is often different (e.g.
+    // this product stores 18K while its Materials metal row is 14K, which made
+    // every purity's weight come out one step light).
+    const metalRow = materials.find(
+      (m: any) => String(m?.materialType || '').toLowerCase() === 'metal',
+    )
+    const baseMetalPurity = metalRow?.quality || p.metalPurity
+
     const attrs: PriceAttributes = {
       metalType: p.metalType,
       metalPurity: p.metalPurity,
-      baseMetalPurity: p.metalPurity,
+      baseMetalPurity,
       metalColor: p.metalColor,
       centerCaratCt: Number(p.centerStoneWeightCt) || 0,
       diamondLines: diamondLines.length ? diamondLines : undefined,
@@ -157,12 +168,17 @@ export class PricingEngineService {
    */
   private purityWeightFactor(purity?: string): number | null {
     if (!purity) return null
-    const p = purity.trim().toUpperCase()
-    if (p.includes('10K')) return 0.85
-    if (p.includes('14K')) return 1
-    if (p.includes('18K')) return 1.15
-    if (p.includes('SILVER') || p.includes('925') || p.includes('999') || p.includes('800'))
-      return 0.85 * 0.85
+    const p = String(purity).trim().toUpperCase()
+    // Silver/Platinum FIRST — their numeric codes (925/950/…) must not be
+    // mistaken for a karat value by the numeric parse below.
+    if (p.includes('SILVER') || /(^|\D)(925|999|800)(\D|$)/.test(p)) return 0.85 * 0.85
+    if (p.includes('PLATINUM') || /(^|\D)(950|900)(\D|$)/.test(p)) return null
+    // Karat may be written "14", "14K", "14KT", "14 KT" — the Materials BOM
+    // stores a bare "14", so matching only on "14K" silently failed here.
+    const kt = Number(p.replace(/KT|K/g, '').replace(/[^0-9.]/g, ''))
+    if (kt === 10) return 0.85
+    if (kt === 14) return 1
+    if (kt === 18) return 1.15
     return null
   }
 
