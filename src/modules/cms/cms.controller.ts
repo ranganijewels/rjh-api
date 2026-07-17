@@ -374,6 +374,56 @@ export class CmsController {
     return this.cmsService.createNavItem(tenantId, dto)
   }
 
+  // Literal route — must be declared before the dynamic 'navigation/:id' GET
+  // below, or Nest matches "admin" as an :id first.
+  @Get('navigation/admin/all')
+  @Roles('admin')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'List all navigation items, flat, incl. inactive (admin)' })
+  listNavigationAdmin(@CurrentUser('tenantId') tenantId: string) {
+    return this.cmsService.listNavigationAdmin(tenantId)
+  }
+
+  @Post('navigation/reorder')
+  @Roles('admin')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Reorder navigation items within a sibling group' })
+  reorderNavItems(
+    @CurrentUser('tenantId') tenantId: string,
+    @Body() dto: { parentId: string | null; orderedIds: string[] },
+  ) {
+    return this.cmsService.reorderNavItems(tenantId, dto.parentId ?? null, dto.orderedIds)
+  }
+
+  @Get('navigation/:id')
+  @Roles('admin')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get a single navigation item (admin)' })
+  getNavItem(@CurrentUser('tenantId') tenantId: string, @Param('id') id: string) {
+    return this.cmsService.getNavItem(tenantId, id)
+  }
+
+  @Put('navigation/:id')
+  @Roles('admin')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Update a navigation item' })
+  updateNavItem(
+    @CurrentUser('tenantId') tenantId: string,
+    @Param('id') id: string,
+    @Body() dto: Record<string, any>,
+  ) {
+    return this.cmsService.updateNavItem(tenantId, id, dto)
+  }
+
+  @Delete('navigation/:id')
+  @Roles('admin')
+  @ApiBearerAuth()
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Delete a navigation item (blocked if it has children)' })
+  deleteNavItem(@CurrentUser('tenantId') tenantId: string, @Param('id') id: string) {
+    return this.cmsService.deleteNavItem(tenantId, id)
+  }
+
   // ─── Theme & Branding ─────────────────────────────────────────────────────
 
   @Public()

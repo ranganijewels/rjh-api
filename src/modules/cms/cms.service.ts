@@ -1,6 +1,6 @@
-import { Injectable, NotFoundException } from '@nestjs/common'
+import { Injectable, NotFoundException, ConflictException } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
-import { Repository } from 'typeorm'
+import { Repository, IsNull } from 'typeorm'
 import { CmsPage } from '../../database/entities/cms-page.entity'
 import { CmsBlog } from '../../database/entities/cms-blog.entity'
 import { CmsFaq } from '../../database/entities/cms-faq.entity'
@@ -582,5 +582,50 @@ export class CmsService {
     }
 
     return roots
+  }
+
+  // Flat list for the admin builder — includes inactive items, unlike
+  // getNavigation() above (public, active-only, nested tree).
+  async listNavigationAdmin(tenantId: string): Promise<CmsNavigation[]> {
+    return this.navRepo.find({ where: { tenantId }, order: { sortOrder: 'ASC' } })
+  }
+
+  async getNavItem(tenantId: string, id: string): Promise<CmsNavigation> {
+    const item = await this.navRepo.findOne({ where: { id, tenantId } })
+    if (!item) throw new NotFoundException('Navigation item not found')
+    return item
+  }
+
+  async updateNavItem(tenantId: string, id: string, dto: Record<string, any>): Promise<CmsNavigation> {
+    const item = await this.getNavItem(tenantId, id)
+    Object.assign(item, dto)
+    return this.navRepo.save(item)
+  }
+
+  // Blocks (rather than cascade-deletes) when the item still has children —
+  // a deliberate conservative default: reparent or remove the children first.
+  async deleteNavItem(tenantId: string, id: string): Promise<void> {
+    const item = await this.getNavItem(tenantId, id)
+    const childCount = await this.navRepo.count({ where: { tenantId, parentId: id } })
+    if (childCount > 0) {
+      throw new ConflictException('Delete or reparent this item\'s children first')
+    }
+    await this.navRepo.remove(item)
+  }
+
+  async reorderNavItems(
+    tenantId: string,
+    parentId: string | null,
+    orderedIds: string[],
+  ): Promise<CmsNavigation[]> {
+    const siblings = await this.navRepo.find({
+      where: { tenantId, parentId: parentId ?? IsNull() },
+    })
+    const updates = siblings.map((s) => {
+      const idx = orderedIds.indexOf(s.id)
+      return this.navRepo.save({ ...s, sortOrder: idx >= 0 ? idx : s.sortOrder })
+    })
+    await Promise.all(updates)
+    return this.listNavigationAdmin(tenantId)
   }
 }

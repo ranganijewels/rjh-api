@@ -57,6 +57,7 @@ export class ProductsService {
     // Categorical filters use case-insensitive partial match so storefront short codes
     // (e.g. "YELLOW", "Round") match stored labels (e.g. "Yellow Gold", "Round Brilliant").
     if (dto.category) qb.andWhere('p.category ILIKE :category', { category: `%${dto.category}%` })
+    if (dto.subCategory) qb.andWhere('p.subCategory ILIKE :subCategory', { subCategory: `%${dto.subCategory}%` })
     if (dto.metalType) qb.andWhere('p.metalType ILIKE :metalType', { metalType: `%${dto.metalType}%` })
     if (dto.metalColor) qb.andWhere('p.metalColor ILIKE :metalColor', { metalColor: `%${dto.metalColor}%` })
     if (dto.diamondShape) qb.andWhere('p.diamondShape ILIKE :diamondShape', { diamondShape: `%${dto.diamondShape}%` })

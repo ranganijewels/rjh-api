@@ -9,6 +9,11 @@ export class ProductFilterDto extends PaginationDto {
   @IsString()
   category?: string
 
+  @ApiPropertyOptional({ description: 'Filter by sub-category / style (e.g. "Halo", "Solitaire")' })
+  @IsOptional()
+  @IsString()
+  subCategory?: string
+
   @ApiPropertyOptional()
   @IsOptional()
   @IsString()
