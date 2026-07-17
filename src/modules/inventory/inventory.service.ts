@@ -25,7 +25,7 @@ import {
   ReservationForType,
 } from '../../database/entities/stock-reservation.entity'
 import { BarcodeQrRecord } from '../../database/entities/barcode-qr-record.entity'
-import { PaginationDto, paginate } from '../../common/dto/pagination.dto'
+import { PaginationDto, paginate, getSkip } from '../../common/dto/pagination.dto'
 
 @Injectable()
 export class InventoryService {
@@ -73,7 +73,7 @@ export class InventoryService {
     const sortField = dto.sortBy || 'createdAt'
     const sortDir = (dto.sortDir?.toUpperCase() as 'ASC' | 'DESC') || 'DESC'
     qb.orderBy(`i.${sortField}`, sortDir)
-    qb.skip(dto.skip).take(dto.limit)
+    qb.skip(getSkip(dto)).take(dto.limit)
 
     const [data, total] = await qb.getManyAndCount()
     return paginate(data, total, dto)
@@ -457,7 +457,7 @@ export class InventoryService {
       .createQueryBuilder('a')
       .where('a.tenantId = :tenantId', { tenantId })
       .orderBy('a.createdAt', 'DESC')
-      .skip(dto.skip)
+      .skip(getSkip(dto))
       .take(dto.limit)
       .getManyAndCount()
     return paginate(adjustments[0], adjustments[1], dto)

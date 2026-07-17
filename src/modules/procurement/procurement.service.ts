@@ -21,7 +21,7 @@ import { GoodsInward, GoodsInwardStatus } from '../../database/entities/goods-in
 import { InventoryItem, ItemType, ItemStatus } from '../../database/entities/inventory-item.entity'
 import { InventoryLedger, LedgerTransactionType, LedgerReferenceType } from '../../database/entities/inventory-ledger.entity'
 import { InventoryLocation } from '../../database/entities/inventory-location.entity'
-import { PaginationDto, paginate } from '../../common/dto/pagination.dto'
+import { PaginationDto, paginate, getSkip } from '../../common/dto/pagination.dto'
 
 @Injectable()
 export class ProcurementService {
@@ -74,7 +74,7 @@ export class ProcurementService {
     const sortField = dto.sortBy || 'createdAt'
     const sortDir = (dto.sortDir?.toUpperCase() as 'ASC' | 'DESC') || 'DESC'
     qb.orderBy(`s.${sortField}`, sortDir)
-    qb.skip(dto.skip).take(dto.limit)
+    qb.skip(getSkip(dto)).take(dto.limit)
 
     const [data, total] = await qb.getManyAndCount()
     return paginate(data, total, dto)
@@ -146,7 +146,7 @@ export class ProcurementService {
     const sortField = dto.sortBy || 'createdAt'
     const sortDir = (dto.sortDir?.toUpperCase() as 'ASC' | 'DESC') || 'DESC'
     qb.orderBy(`v.${sortField}`, sortDir)
-    qb.skip(dto.skip).take(dto.limit)
+    qb.skip(getSkip(dto)).take(dto.limit)
 
     const [data, total] = await qb.getManyAndCount()
     return paginate(data, total, dto)
@@ -197,7 +197,7 @@ export class ProcurementService {
     }
 
     qb.orderBy('pr.createdAt', 'DESC')
-    qb.skip(dto.skip).take(dto.limit)
+    qb.skip(getSkip(dto)).take(dto.limit)
 
     const [data, total] = await qb.getManyAndCount()
     return paginate(data, total, dto)
@@ -272,7 +272,7 @@ export class ProcurementService {
     }
 
     qb.orderBy('po.createdAt', 'DESC')
-    qb.skip(dto.skip).take(dto.limit)
+    qb.skip(getSkip(dto)).take(dto.limit)
 
     const [data, total] = await qb.getManyAndCount()
     return paginate(data, total, dto)
@@ -329,7 +329,7 @@ export class ProcurementService {
     }
 
     qb.orderBy('g.createdAt', 'DESC')
-    qb.skip(dto.skip).take(dto.limit)
+    qb.skip(getSkip(dto)).take(dto.limit)
 
     const [data, total] = await qb.getManyAndCount()
     return paginate(data, total, dto)

@@ -7,7 +7,7 @@ import { CmsFaq } from '../../database/entities/cms-faq.entity'
 import { CmsNavigation } from '../../database/entities/cms-navigation.entity'
 import { CmsSection } from '../../database/entities/cms-section.entity'
 import { Tenant } from '../../database/entities/tenant.entity'
-import { PaginationDto, paginate } from '../../common/dto/pagination.dto'
+import { PaginationDto, paginate, getSkip } from '../../common/dto/pagination.dto'
 import { sanitizeHtml } from '../../common/utils/sanitize-html'
 
 interface NavigationNode extends CmsNavigation {
@@ -413,7 +413,7 @@ export class CmsService {
     }
 
     qb.orderBy(`blog.${dto.sortBy || 'publishedAt'}`, dto.sortDir === 'asc' ? 'ASC' : 'DESC')
-      .skip(dto.skip)
+      .skip(getSkip(dto))
       .take(dto.limit || 20)
 
     const [data, total] = await qb.getManyAndCount()

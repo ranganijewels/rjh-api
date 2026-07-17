@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common'
-import { PaginationDto } from '../../common/dto/pagination.dto'
+import { PaginationDto, getSkip } from '../../common/dto/pagination.dto'
 
 @Injectable()
 export class ChannelsService {
@@ -8,8 +8,9 @@ export class ChannelsService {
 
   async getListings(tenantId: string, dto: PaginationDto) {
     const tenantListings = this.listings.filter((l) => l.tenantId === tenantId)
+    const skip = getSkip(dto)
     return {
-      data: tenantListings.slice(dto.skip, dto.skip + dto.limit),
+      data: tenantListings.slice(skip, skip + dto.limit),
       meta: { page: dto.page, limit: dto.limit, total: tenantListings.length, totalPages: Math.ceil(tenantListings.length / dto.limit) },
     }
   }
@@ -37,8 +38,9 @@ export class ChannelsService {
 
   async getExportLogs(tenantId: string, dto: PaginationDto) {
     const logs = this.exportLogs.filter((l) => l.tenantId === tenantId)
+    const skip = getSkip(dto)
     return {
-      data: logs.slice(dto.skip, dto.skip + dto.limit),
+      data: logs.slice(skip, skip + dto.limit),
       meta: { page: dto.page, limit: dto.limit, total: logs.length, totalPages: Math.ceil(logs.length / dto.limit) },
     }
   }

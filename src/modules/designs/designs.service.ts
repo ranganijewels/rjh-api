@@ -12,7 +12,7 @@ import { DesignMedia } from '../../database/entities/design-media.entity'
 import { CreateDesignDto } from './dto/create-design.dto'
 import { UpdateDesignDto } from './dto/update-design.dto'
 import { DesignFilterDto } from './dto/design-filter.dto'
-import { paginate } from '../../common/dto/pagination.dto'
+import { paginate, getSkip } from '../../common/dto/pagination.dto'
 
 @Injectable()
 export class DesignsService {
@@ -55,7 +55,7 @@ export class DesignsService {
     const sortDir = (dto.sortDir?.toUpperCase() as 'ASC' | 'DESC') || 'DESC'
     qb.orderBy(`d.${sortField}`, sortDir)
 
-    qb.skip(dto.skip).take(dto.limit)
+    qb.skip(getSkip(dto)).take(dto.limit)
 
     const [data, total] = await qb.getManyAndCount()
     return paginate(data, total, dto)

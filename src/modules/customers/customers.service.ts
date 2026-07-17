@@ -7,7 +7,7 @@ import { InjectRepository } from '@nestjs/typeorm'
 import { Repository } from 'typeorm'
 import { Customer } from '../../database/entities/customer.entity'
 import { CustomerAddress } from '../../database/entities/customer-address.entity'
-import { PaginationDto, paginate } from '../../common/dto/pagination.dto'
+import { PaginationDto, paginate, getSkip } from '../../common/dto/pagination.dto'
 
 @Injectable()
 export class CustomersService {
@@ -39,7 +39,7 @@ export class CustomersService {
     const sortField = dto.sortBy || 'createdAt'
     const sortDir = (dto.sortDir?.toUpperCase() as 'ASC' | 'DESC') || 'DESC'
     qb.orderBy(`c.${sortField}`, sortDir)
-    qb.skip(dto.skip).take(dto.limit)
+    qb.skip(getSkip(dto)).take(dto.limit)
 
     const [data, total] = await qb.getManyAndCount()
     return paginate(data, total, dto)

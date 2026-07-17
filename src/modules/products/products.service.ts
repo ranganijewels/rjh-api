@@ -12,7 +12,7 @@ import { ProductMedia } from '../../database/entities/product-media.entity'
 import { CreateProductDto } from './dto/create-product.dto'
 import { UpdateProductDto } from './dto/update-product.dto'
 import { ProductFilterDto } from './dto/product-filter.dto'
-import { paginate } from '../../common/dto/pagination.dto'
+import { paginate, getSkip } from '../../common/dto/pagination.dto'
 
 @Injectable()
 export class ProductsService {
@@ -74,7 +74,7 @@ export class ProductsService {
     const sortDir = (dto.sortDir?.toUpperCase() as 'ASC' | 'DESC') || 'DESC'
     qb.orderBy(`p.${sortField}`, sortDir)
 
-    qb.skip(dto.skip).take(dto.limit)
+    qb.skip(getSkip(dto)).take(dto.limit)
 
     const [data, total] = await qb.getManyAndCount()
     return paginate(data, total, dto)

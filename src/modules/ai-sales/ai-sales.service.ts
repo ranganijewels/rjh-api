@@ -13,7 +13,7 @@ import {
   AiSalesAgentSettings,
   AiAgentName,
 } from '../../database/entities/ai-sales-agent-settings.entity'
-import { PaginationDto, paginate } from '../../common/dto/pagination.dto'
+import { PaginationDto, paginate, getSkip } from '../../common/dto/pagination.dto'
 
 @Injectable()
 export class AiSalesService {
@@ -56,7 +56,7 @@ export class AiSalesService {
     }
 
     qb.orderBy(`lead.${dto.sortBy || 'createdAt'}`, dto.sortDir === 'asc' ? 'ASC' : 'DESC')
-      .skip(dto.skip)
+      .skip(getSkip(dto))
       .take(dto.limit || 20)
 
     const [data, total] = await qb.getManyAndCount()

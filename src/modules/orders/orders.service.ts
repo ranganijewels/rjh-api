@@ -11,7 +11,7 @@ import { JobCard, ProductionStatus } from '../../database/entities/job-card.enti
 import { Customer } from '../../database/entities/customer.entity'
 import { Product } from '../../database/entities/product.entity'
 import { Design } from '../../database/entities/design.entity'
-import { PaginationDto, paginate } from '../../common/dto/pagination.dto'
+import { PaginationDto, paginate, getSkip } from '../../common/dto/pagination.dto'
 
 @Injectable()
 export class OrdersService {
@@ -71,7 +71,7 @@ export class OrdersService {
     const sortField = dto.sortBy || 'createdAt'
     const sortDir = (dto.sortDir?.toUpperCase() as 'ASC' | 'DESC') || 'DESC'
     qb.orderBy(`o.${sortField}`, sortDir)
-    qb.skip(dto.skip).take(dto.limit)
+    qb.skip(getSkip(dto)).take(dto.limit)
 
     const [data, total] = await qb.getManyAndCount()
     return paginate(data, total, dto)
@@ -268,7 +268,7 @@ export class OrdersService {
     const sortField = dto.sortBy || 'createdAt'
     const sortDir = (dto.sortDir?.toUpperCase() as 'ASC' | 'DESC') || 'DESC'
     qb.orderBy(`jc.${sortField}`, sortDir)
-    qb.skip(dto.skip).take(dto.limit)
+    qb.skip(getSkip(dto)).take(dto.limit)
 
     const [data, total] = await qb.getManyAndCount()
     return paginate(data, total, dto)

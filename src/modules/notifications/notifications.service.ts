@@ -2,7 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
 import { Repository } from 'typeorm'
 import { Notification, NotificationType } from '../../database/entities/notification.entity'
-import { PaginationDto, paginate } from '../../common/dto/pagination.dto'
+import { PaginationDto, paginate, getSkip } from '../../common/dto/pagination.dto'
 
 @Injectable()
 export class NotificationsService {
@@ -17,7 +17,7 @@ export class NotificationsService {
       .where('n.tenantId = :tenantId', { tenantId })
       .andWhere('(n.userId = :userId OR n.userId IS NULL)', { userId })
       .orderBy(`n.${dto.sortBy || 'createdAt'}`, dto.sortDir === 'asc' ? 'ASC' : 'DESC')
-      .skip(dto.skip)
+      .skip(getSkip(dto))
       .take(dto.limit || 20)
 
     const [data, total] = await qb.getManyAndCount()

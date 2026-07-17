@@ -7,7 +7,7 @@ import { InjectRepository } from '@nestjs/typeorm'
 import { Repository, Between, LessThanOrEqual, MoreThanOrEqual } from 'typeorm'
 import { SalesLead, SalesLeadStage } from '../../database/entities/sales-lead.entity'
 import { SalesFollowUp, FollowUpStatus } from '../../database/entities/sales-follow-up.entity'
-import { PaginationDto, paginate } from '../../common/dto/pagination.dto'
+import { PaginationDto, paginate, getSkip } from '../../common/dto/pagination.dto'
 
 @Injectable()
 export class SalesService {
@@ -42,7 +42,7 @@ export class SalesService {
     }
 
     qb.orderBy(`lead.${dto.sortBy || 'createdAt'}`, dto.sortDir === 'asc' ? 'ASC' : 'DESC')
-      .skip(dto.skip)
+      .skip(getSkip(dto))
       .take(dto.limit || 20)
 
     const [data, total] = await qb.getManyAndCount()
@@ -110,7 +110,7 @@ export class SalesService {
     }
 
     qb.orderBy(`fu.${dto.sortBy || 'scheduledAt'}`, dto.sortDir === 'asc' ? 'ASC' : 'DESC')
-      .skip(dto.skip)
+      .skip(getSkip(dto))
       .take(dto.limit || 20)
 
     const [data, total] = await qb.getManyAndCount()

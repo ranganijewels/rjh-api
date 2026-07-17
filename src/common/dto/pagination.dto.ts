@@ -32,10 +32,14 @@ export class PaginationDto {
   @IsOptional()
   @IsString()
   search?: string
-
-  skip?: number
 }
 
+// Every list endpoint computes its offset via this helper, not a `dto.skip`
+// field — no client ever sends `skip` directly, only page+limit. A prior
+// `skip?: number` field on this DTO was never populated by anything, so
+// call sites reading `dto.skip` silently offset by `undefined` (i.e. always
+// page 1) while `meta.page` still reported the requested page — pagination
+// looked correct but every page returned the same rows.
 export function getSkip(dto: PaginationDto): number {
   return ((dto.page || 1) - 1) * (dto.limit || 20)
 }
