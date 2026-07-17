@@ -64,7 +64,73 @@ const SEEDS: Seed[] = [
   { kind: 'setting_type', code: 'CHANNEL', name: 'Channel', sortOrder: 4 },
   { kind: 'setting_type', code: 'HALO', name: 'Halo', sortOrder: 5 },
   { kind: 'setting_type', code: 'TENSION', name: 'Tension', sortOrder: 6 },
+  // Categories (mirrors the old hardcoded CATEGORIES list in the product form)
+  { kind: 'category', code: 'RINGS', name: 'Rings', sortOrder: 1 },
+  { kind: 'category', code: 'NECKLACES', name: 'Necklaces', sortOrder: 2 },
+  { kind: 'category', code: 'WEDDING_BANDS', name: 'Wedding Bands', sortOrder: 3 },
+  { kind: 'category', code: 'BRACELETS', name: 'Bracelets', sortOrder: 4 },
+  { kind: 'category', code: 'EARRINGS', name: 'Earrings', sortOrder: 5 },
+  { kind: 'category', code: 'PENDANTS', name: 'Pendants', sortOrder: 6 },
+  { kind: 'category', code: 'BANGLES', name: 'Bangles', sortOrder: 7 },
+  // Style (backs both the "Sub Category / Style" and "Style" product-form fields)
+  { kind: 'style', code: 'SOLITAIRE', name: 'Solitaire', sortOrder: 1 },
+  { kind: 'style', code: 'HALO', name: 'Halo', sortOrder: 2 },
+  { kind: 'style', code: 'HIDDEN_HALO', name: 'Hidden Halo', sortOrder: 3 },
+  { kind: 'style', code: 'VINTAGE_HALO', name: 'Vintage Halo', sortOrder: 4 },
+  { kind: 'style', code: 'THREE_STONE', name: 'Three Stone', sortOrder: 5 },
+  { kind: 'style', code: 'TWO_STONE', name: 'Two Stone', sortOrder: 6 },
+  { kind: 'style', code: 'SIDE_STONE', name: 'Side Stone', sortOrder: 7 },
+  { kind: 'style', code: 'BEZEL', name: 'Bezel', sortOrder: 8 },
+  { kind: 'style', code: 'PAVE', name: 'Pavé', sortOrder: 9 },
+  { kind: 'style', code: 'BRIDAL_SETS', name: 'Bridal Sets', sortOrder: 10 },
+  { kind: 'style', code: 'VINTAGE_ANTIQUE', name: 'Vintage & Antique', sortOrder: 11 },
+  { kind: 'style', code: 'GEMSTONE', name: 'Gemstone', sortOrder: 12 },
+  // Collection (marketing/tag field on each product — distinct from the
+  // separate "Manage Collection" storefront feature, which has its own
+  // name+slug+assigned-products records)
+  { kind: 'collection', code: 'ENGAGEMENT', name: 'Engagement', sortOrder: 1 },
+  { kind: 'collection', code: 'WEDDING', name: 'Wedding', sortOrder: 2 },
+  { kind: 'collection', code: 'ANNIVERSARY', name: 'Anniversary', sortOrder: 3 },
+  { kind: 'collection', code: 'PROPOSAL', name: 'Proposal', sortOrder: 4 },
+  { kind: 'collection', code: 'BIRTHDAY_GIFT', name: 'Birthday Gift', sortOrder: 5 },
+  { kind: 'collection', code: 'SPECIAL_MOMENT', name: 'Special Moment', sortOrder: 6 },
+  { kind: 'collection', code: 'MINIMAL', name: 'Minimal', sortOrder: 7 },
+  // Materials BOM "Component" column — jewelry-part naming
+  { kind: 'component_type', code: 'CENTER_STONE', name: 'Center Stone', sortOrder: 1 },
+  { kind: 'component_type', code: 'SIDE_STONE', name: 'Side Stone', sortOrder: 2 },
+  { kind: 'component_type', code: 'SHANK', name: 'Shank', sortOrder: 3 },
+  { kind: 'component_type', code: 'PRONG', name: 'Prong', sortOrder: 4 },
+  { kind: 'component_type', code: 'HALO', name: 'Halo', sortOrder: 5 },
+  { kind: 'component_type', code: 'BEZEL', name: 'Bezel', sortOrder: 6 },
+  { kind: 'component_type', code: 'ACCENT', name: 'Accent', sortOrder: 7 },
+  { kind: 'component_type', code: 'FINDING', name: 'Finding', sortOrder: 8 },
+  // Materials BOM "Metal/Stone" column when materialType is Diamond/Stone
+  { kind: 'stone_type', code: 'LAB_GROWN_DIAMOND', name: 'Lab Grown Diamond', sortOrder: 1 },
+  { kind: 'stone_type', code: 'NATURAL_DIAMOND', name: 'Natural Diamond', sortOrder: 2 },
+  { kind: 'stone_type', code: 'MOISSANITE', name: 'Moissanite', sortOrder: 3 },
+  { kind: 'stone_type', code: 'CVD', name: 'CVD', sortOrder: 4 },
+  { kind: 'stone_type', code: 'HPHT', name: 'HPHT', sortOrder: 5 },
+  { kind: 'stone_type', code: 'RUBY', name: 'Ruby', sortOrder: 6 },
+  { kind: 'stone_type', code: 'SAPPHIRE', name: 'Sapphire', sortOrder: 7 },
+  { kind: 'stone_type', code: 'EMERALD', name: 'Emerald', sortOrder: 8 },
+  // Materials BOM "Color" column when materialType is Diamond/Stone (GIA
+  // colorless/near-colorless scale)
+  { kind: 'diamond_color', code: 'D', name: 'D', sortOrder: 1 },
+  { kind: 'diamond_color', code: 'E', name: 'E', sortOrder: 2 },
+  { kind: 'diamond_color', code: 'F', name: 'F', sortOrder: 3 },
+  { kind: 'diamond_color', code: 'G', name: 'G', sortOrder: 4 },
+  { kind: 'diamond_color', code: 'H', name: 'H', sortOrder: 5 },
+  { kind: 'diamond_color', code: 'I', name: 'I', sortOrder: 6 },
+  { kind: 'diamond_color', code: 'J', name: 'J', sortOrder: 7 },
+  { kind: 'diamond_color', code: 'K', name: 'K', sortOrder: 8 },
+  { kind: 'diamond_color', code: 'L', name: 'L', sortOrder: 9 },
+  { kind: 'diamond_color', code: 'M', name: 'M', sortOrder: 10 },
 ]
+
+// Kinds introduced after the initial launch: on an already-provisioned tenant,
+// seedDefaults() never re-runs its bulk-insert branch, so any kind added here
+// also needs an entry below or it silently never appears outside a fresh DB.
+const BACKFILL_KINDS = ['category', 'style', 'collection', 'component_type', 'stone_type', 'diamond_color']
 
 @Injectable()
 export class CatalogSeeder {
@@ -146,6 +212,29 @@ export class CatalogSeeder {
         row.metadata = { ...row.metadata, pricingFactor: seed.metadata!.pricingFactor }
         await this.repo.save(row)
         this.logger.log(`Stamped pricingFactor on metal_purity ${seed.code}`)
+      }
+    }
+
+    // Any kind added to SEEDS after initial launch: insert rows missing on
+    // this tenant. No-ops once applied; admin edits/additions are untouched.
+    for (const seed of SEEDS.filter((s) => BACKFILL_KINDS.includes(s.kind))) {
+      const exists = await this.repo.findOne({
+        where: { tenantId: TENANT, kind: seed.kind, code: seed.code },
+      })
+      if (!exists) {
+        await this.repo.save(
+          this.repo.create({
+            tenantId: TENANT,
+            kind: seed.kind,
+            code: seed.code,
+            name: seed.name,
+            sortOrder: seed.sortOrder ?? 0,
+            synonyms: seed.synonyms || [],
+            metadata: seed.metadata || {},
+            status: 'active',
+          }),
+        )
+        this.logger.log(`Added ${seed.kind} ${seed.code}`)
       }
     }
   }
