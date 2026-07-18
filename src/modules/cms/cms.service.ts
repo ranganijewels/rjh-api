@@ -365,8 +365,266 @@ export class CmsService {
       },
     ]
 
+    // Mega-menu content for the storefront header's 5 rich dropdowns
+    // (Engagement/Wedding/Jewelry/Customize/About Us). Ported verbatim from
+    // the previously-hardcoded `MENUS_OPTIONS`/`mediaCategories` in
+    // `elova_frontend_apr_2026 (1)/src/components/layout/Navbar/constant.js`
+    // so seeding this produces the exact menu that's already live — only
+    // subsequent admin edits change anything. Items that were plain strings
+    // in the original array (no real link) are normalized to
+    // `{label, link:'/product'}` here, matching the default href the
+    // storefront already falls back to for those bare-string items.
+    const megaMenu: Partial<CmsSection>[] = [
+      {
+        sectionKey: 'engagement',
+        sectionType: 'mega-menu',
+        label: 'Engagement',
+        isPublished: true,
+        content: {
+          columns: [
+            {
+              title: 'SHOP BY STYLE',
+              items: [
+                { label: 'Solitaire', link: '/product?subcat=Solitaire&collection=Engagement' },
+                { label: 'Side stone', link: '/product?subcat=Side+Stone&collection=Engagement' },
+                { label: 'Halo', link: '/product?subcat=Halo&collection=Engagement' },
+                { label: 'Three stone', link: '/product?subcat=Three+Stone&collection=Engagement' },
+                { label: 'Hidden halo', link: '/product?subcat=Hidden+Halo&collection=Engagement' },
+                { label: 'Vintage & antique', link: '/product?subcat=Vintage&collection=Engagement' },
+                { label: 'Bridal sets', link: '/product?subcat=Bridal+Sets&collection=Engagement' },
+                { label: 'Gemstone', link: '/product?subcat=Gemstone&collection=Engagement' },
+                { label: 'Two Stone', link: '/product?subcat=Two+Stone&collection=Engagement' },
+                { label: 'Pave', link: '/product?subcat=Pave&collection=Engagement' },
+              ],
+            },
+            {
+              title: 'SHOP BY SHAPE',
+              items: [
+                { label: 'Round', link: '/product?shape=Round&collection=Engagement' },
+                { label: 'Princess', link: '/product?shape=Princess&collection=Engagement' },
+                { label: 'Oval', link: '/product?shape=Oval&collection=Engagement' },
+                { label: 'Radiant', link: '/product?shape=Radiant&collection=Engagement' },
+                { label: 'Pear', link: '/product?shape=Pear&collection=Engagement' },
+                { label: 'Emerald', link: '/product?shape=Emerald&collection=Engagement' },
+                { label: 'Marquise', link: '/product?shape=Marquise&collection=Engagement' },
+                { label: 'Heart', link: '/product?shape=Heart&collection=Engagement' },
+                { label: 'Cushion', link: '/product?shape=Cushion&collection=Engagement' },
+                { label: 'Asscher', link: '/product?shape=Asscher&collection=Engagement' },
+              ],
+            },
+            {
+              title: 'METAL',
+              items: [
+                { label: 'Yellow Gold', link: '/product?metal=yellow&collection=Engagement' },
+                { label: 'White Gold', link: '/product?metal=white&collection=Engagement' },
+                { label: 'Rose Gold', link: '/product?metal=rose&collection=Engagement' },
+                { label: 'Two Tone', link: '/product?metal=Two+Tone&collection=Engagement' },
+              ],
+            },
+            {
+              title: 'CUSTOM & SERVICES',
+              items: [
+                { label: 'Design Your Own Ring', link: '/customize?category=ring' },
+                { label: 'Virtual Consultation', link: '/book-consultancy' },
+                { label: 'Free Resizing', link: '/product' },
+                { label: 'Jewelry Care', link: '/jewelry-care' },
+              ],
+            },
+          ],
+          imageSection: {
+            imageUrl: '/images/home/engagement-rings.jpg',
+            title: 'Not Sure Where to Start?',
+            description: 'Our jewelry experts are here to guide you — from choosing the perfect diamond to customizing your forever ring.',
+            ctaText: 'BOOK A VIRTUAL APPOINTMENT',
+            ctaUrl: '#book-appointment',
+          },
+        },
+      },
+      {
+        sectionKey: 'wedding',
+        sectionType: 'mega-menu',
+        label: 'Wedding',
+        isPublished: true,
+        content: {
+          columns: [
+            {
+              title: 'SHOP BY STYLE',
+              items: [
+                { label: 'Solitaire', link: '/product?subcat=Solitaire&collection=Wedding' },
+                { label: 'Side stone', link: '/product?subcat=Side+Stone&collection=Wedding' },
+                { label: 'Halo', link: '/product?subcat=Halo&collection=Wedding' },
+                { label: 'Three stone', link: '/product?subcat=Three+Stone&collection=Wedding' },
+                { label: 'Vintage & antique', link: '/product?subcat=Vintage&collection=Wedding' },
+                { label: 'Bridal sets', link: '/product?subcat=Bridal+Sets&collection=Wedding' },
+                { label: 'Two Stone', link: '/product?subcat=Two+Stone&collection=Wedding' },
+                { label: 'Pave', link: '/product?subcat=Pave&collection=Wedding' },
+              ],
+            },
+            {
+              title: 'SHOP BY SHAPE',
+              items: [
+                { label: 'Round', link: '/product?shape=Round&collection=Wedding' },
+                { label: 'Princess', link: '/product?shape=Princess&collection=Wedding' },
+                { label: 'Oval', link: '/product?shape=Oval&collection=Wedding' },
+                { label: 'Radiant', link: '/product?shape=Radiant&collection=Wedding' },
+                { label: 'Pear', link: '/product?shape=Pear&collection=Wedding' },
+                { label: 'Emerald', link: '/product?shape=Emerald&collection=Wedding' },
+                { label: 'Marquise', link: '/product?shape=Marquise&collection=Wedding' },
+                { label: 'Heart', link: '/product?shape=Heart&collection=Wedding' },
+                { label: 'Cushion', link: '/product?shape=Cushion&collection=Wedding' },
+                { label: 'Asscher', link: '/product?shape=Asscher&collection=Wedding' },
+              ],
+            },
+            {
+              title: 'METAL',
+              items: [
+                { label: 'Yellow Gold', link: '/product?metal=yellow&collection=Wedding' },
+                { label: 'White Gold', link: '/product?metal=white&collection=Wedding' },
+                { label: 'Rose Gold', link: '/product?metal=rose&collection=Wedding' },
+                { label: 'Two Tone', link: '/product?metal=Two+Tone&collection=Wedding' },
+              ],
+            },
+            {
+              title: 'Mens',
+              items: [
+                { label: "Men's Diamond Ring", link: '/product?search=mens&collection=Wedding' },
+                { label: 'Diamond & Gemstone', link: '/product?search=gemstone&collection=Wedding' },
+              ],
+            },
+          ],
+          imageSection: {
+            imageUrl: '/images/home/wedding.jpg',
+            title: 'Bands That Tell Your Story',
+            description: 'From timeless classics to modern silhouettes, our bands are crafted to mark a lifetime of moments.',
+            ctaText: 'Explore Matching Bands',
+            ctaUrl: '/product?collection=Wedding',
+          },
+        },
+      },
+      {
+        sectionKey: 'jewelry',
+        sectionType: 'mega-menu',
+        label: 'Jewelry',
+        isPublished: true,
+        content: {
+          columns: [
+            {
+              title: 'Shop by Category',
+              items: [
+                { label: 'Rings', link: '/product?category_id=ring&collection=Jewellery' },
+                { label: 'Earrings', link: '/product?category_id=earring&collection=Jewellery' },
+                { label: 'Necklaces', link: '/product?category_id=necklace&collection=Jewellery' },
+                { label: 'Bracelets', link: '/product?category_id=bracelet&collection=Jewellery' },
+                { label: 'Pendant', link: '/product?category_id=pendant&collection=Jewellery' },
+              ],
+            },
+            {
+              title: 'SHOP BY OCCASION',
+              items: [
+                { label: 'Everyday Essentials', link: '/product' },
+                { label: 'Bridal & Ceremony', link: '/product' },
+                { label: 'Gifting Favourites', link: '/product' },
+                { label: 'Milestone Moments', link: '/product' },
+                { label: 'Red Carpet Edit', link: '/product' },
+                { label: 'Travel-Friendly Luxury', link: '/product' },
+              ],
+            },
+            {
+              title: 'FEATURED',
+              items: [
+                { label: 'New Arrivals', link: '/product?sort_by=createdAt_desc' },
+                { label: 'Bestsellers', link: '/#best-seller' },
+                { label: 'Limited Editions', link: '/product' },
+                { label: 'Curated by RJ HOUSE', link: '/product' },
+              ],
+            },
+            {
+              title: 'STYLE & EDUCATION',
+              items: [
+                { label: 'Jewelry Styling Guide', link: '/product' },
+                { label: 'How to Layer & Stack', link: '/product' },
+                { label: 'Jewelry Care', link: '/product' },
+                { label: 'Metals & Materials', link: '/product' },
+                { label: 'Lab-Grown Diamond Info', link: '/product' },
+              ],
+            },
+          ],
+          imageSection: {
+            imageUrl: '/images/home/jewellery.jpg',
+            title: 'Modern Heirlooms. Effortlessly Iconic',
+            description: 'Discover fine jewelry crafted with intention — minimalist lines, timeless materials, and international craftsmanship.',
+            ctaText: 'EXPLORE THE COLLECTION',
+            ctaUrl: '/product',
+          },
+        },
+      },
+      {
+        sectionKey: 'customize',
+        sectionType: 'mega-menu-tiles',
+        label: 'Customize',
+        isPublished: true,
+        content: {
+          mediaTiles: [
+            { label: 'Engagement Rings', image: '/images/customize/proposal-ring.png', link: '/customize?category=ring' },
+            { label: 'Wedding Bands', image: '/images/customize/twin-band-design.png', link: '/customize?category=band' },
+            { label: 'Bracelets', image: '/images/home/Bracelets-collection.png', link: '/customize?category=bracelet' },
+            { label: 'Necklaces', image: '/images/home/Necklaces-collection.png', link: '/customize?category=necklace' },
+            { label: 'Earrings', image: '/images/home/Earrings-collection.png', link: '/customize?category=earring' },
+          ],
+        },
+      },
+      {
+        sectionKey: 'about-us',
+        sectionType: 'mega-menu',
+        label: 'About Us',
+        isPublished: true,
+        content: {
+          columns: [
+            {
+              title: 'Our Story',
+              items: [
+                { label: 'The RJ HOUSE Journey', link: '/about-us#our-story' },
+                { label: 'Our Mission & Values', link: '/about-us#mission-values' },
+                { label: 'The Meaning Behind the Name', link: '/about-us#meaning-name' },
+                { label: 'What Makes Us Different', link: '/about-us#what-different' },
+              ],
+            },
+            {
+              title: 'Craftsmanship',
+              items: [
+                { label: 'Craft of an RJ HOUSE Piece', link: '/craftsmanship#craft' },
+                { label: 'Our Design Philosophy', link: '/craftsmanship#design-philosophy' },
+                { label: 'Behind the Atelier', link: '/craftsmanship#atelier' },
+                { label: 'Materials & Sourcing', link: '/craftsmanship#materials' },
+              ],
+            },
+            {
+              title: 'Sustainability',
+              items: [
+                { label: 'Our Ethical Promise', link: '/sustainability#ethical-promise' },
+                { label: 'Lab-Grown Diamond Commitment', link: '/sustainability#lab-grown' },
+                { label: 'Responsible Sourcing', link: '/sustainability#responsible-sourcing' },
+                { label: 'Environmental Impact', link: '/sustainability#environmental-impact' },
+              ],
+            },
+            {
+              title: 'Customer Love',
+              items: [
+                { label: 'Testimonials', link: '/customer-love#testimonials' },
+                { label: 'Reviews', link: '/customer-love#reviews' },
+                { label: 'Client Stories', link: '/customer-love#client-stories' },
+                { label: 'Real Moments', link: '/customer-love#real-moments' },
+              ],
+            },
+          ],
+          imageSection: null,
+        },
+      },
+    ]
+
     const defaultSections: Record<string, Partial<CmsSection>[]> = {
       homepage,
+      'mega-menu': megaMenu,
       'about-us': [
         { sectionKey: 'hero', sectionType: 'hero', label: 'Hero', description: 'Page hero', isPublished: true, content: { heading: 'Our Story', subHeading: 'Crafting jewelry since 1990', imageUrl: '' } },
         { sectionKey: 'story', sectionType: 'text-image', label: 'Our Story', description: 'Story section', isPublished: true, content: { heading: 'The RJ House Legacy', body: 'Founded in 1990...', imageUrl: '' } },
