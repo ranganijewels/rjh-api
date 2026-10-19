@@ -96,6 +96,14 @@ export class CmsService {
       dto = { ...dto, content: sanitizeHtml(dto.content) }
     }
     let page = await this.pageRepo.findOne({ where: { tenantId, slug } })
+    // Two editors (Studio + Admin) write here: never let a save blank out a
+    // title/meta that already has a value, and never move identity fields.
+    const clean: Record<string, any> = { ...dto }
+    for (const k of ['id', 'slug', 'tenantId', 'createdAt', 'updatedAt', 'createdBy']) delete clean[k]
+    for (const k of ['title', 'metaTitle', 'metaDescription']) {
+      if (page && typeof clean[k] === 'string' && !clean[k].trim() && (page as any)[k]) delete clean[k]
+    }
+    dto = clean as Partial<CmsPage>
 
     if (page) {
       Object.assign(page, dto)
@@ -275,7 +283,7 @@ export class CmsService {
             { icon: '💎', title: 'Certified Diamonds', description: 'IGI & GIA certified stones' },
             { icon: '🏆', title: 'Premium Quality', description: 'BIS Hallmarked gold & platinum' },
             { icon: '🚚', title: 'Free Shipping', description: 'Free insured delivery across India' },
-            { icon: '↩️', title: 'Easy Returns', description: '30-day hassle-free returns' },
+            { icon: '↩️', title: 'Easy Returns', description: '14-day returns on eligible items' },
           ],
         },
       },
@@ -661,7 +669,7 @@ export class CmsService {
     }
 
     if (dto.tag) {
-      qb.andWhere(':tag = ANY(blog.tags)', { tag: dto.tag })
+      qb.andWhere('blog.tags ? :tag', { tag: dto.tag })
     }
 
     if (dto.search) {
@@ -678,10 +686,26 @@ export class CmsService {
     return paginate(data, total, dto)
   }
 
-  async getBlog(tenantId: string, slug: string): Promise<CmsBlog> {
-    const blog = await this.blogRepo.findOne({ where: { tenantId, slug } })
+  async getBlog(tenantId: string, slug: string, publishedOnly = true): Promise<CmsBlog> {
+    const where: any = { tenantId, slug }
+    if (publishedOnly) where.isPublished = true
+    const blog = await this.blogRepo.findOne({ where })
     if (!blog) throw new NotFoundException('Blog post not found')
     return blog
+  }
+
+  // Older editors send snake_case keys (is_published, body, cover_image, tag);
+  // the entity is camelCase. Normalise so every editor saves the same fields.
+  private normalizeBlogDto(dto: Record<string, any>): Partial<CmsBlog> {
+    const out: Record<string, any> = { ...dto }
+    if (out.is_published !== undefined && out.isPublished === undefined) out.isPublished = !!out.is_published
+    if (out.body !== undefined && out.content === undefined) out.content = out.body
+    if (out.cover_image !== undefined && out.featuredImageUrl === undefined) out.featuredImageUrl = out.cover_image
+    if (out.tag !== undefined && out.tags === undefined) {
+      out.tags = String(out.tag || '').split(',').map((t) => t.trim()).filter(Boolean)
+    }
+    for (const k of ['is_published', 'body', 'cover_image', 'tag', 'id', 'slug', 'tenantId', 'createdAt', 'updatedAt']) delete out[k]
+    return out as Partial<CmsBlog>
   }
 
   async getBlogById(tenantId: string, id: string): Promise<CmsBlog> {
@@ -709,6 +733,7 @@ export class CmsService {
     dto: Partial<CmsBlog>,
     userId: string,
   ): Promise<CmsBlog> {
+    dto = this.normalizeBlogDto(dto as any)
     // Blog bodies render as HTML on the storefront — sanitize like pages.
     if (typeof (dto as any).content === 'string') {
       dto = { ...dto, content: sanitizeHtml((dto as any).content) } as any
@@ -736,6 +761,10 @@ export class CmsService {
   async updateBlogById(tenantId: string, id: string, dto: Partial<CmsBlog>, userId: string): Promise<CmsBlog> {
     const blog = await this.blogRepo.findOne({ where: { id, tenantId } })
     if (!blog) throw new NotFoundException('Blog post not found')
+    dto = this.normalizeBlogDto(dto as any)
+    if (typeof (dto as any).content === 'string') {
+      dto = { ...dto, content: sanitizeHtml((dto as any).content) } as any
+    }
     Object.assign(blog, dto)
     if (dto.isPublished && !blog.publishedAt) blog.publishedAt = new Date()
     return this.blogRepo.save(blog)

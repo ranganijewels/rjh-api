@@ -43,8 +43,16 @@ export class ProductMedia {
   @Column({ name: 'title', nullable: true })
   title: string
 
+  // Internal role marker only ("main" | "rollover" | "gallery") — NOT the
+  // accessibility/SEO description shown to screen readers or search engines.
+  // See seoAltText below for that.
   @Column({ name: 'alt_text', nullable: true })
   altText: string
+
+  // Real, admin-editable image description for accessibility + SEO
+  // (rendered as the <img alt="…">, and read by the sitemap/feed generators).
+  @Column({ name: 'seo_alt_text', type: 'text', nullable: true })
+  seoAltText: string
 
   @Column({ name: 'metal_color', nullable: true })
   metalColor: string

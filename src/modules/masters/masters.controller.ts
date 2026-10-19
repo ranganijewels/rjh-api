@@ -65,8 +65,11 @@ export class MastersController {
     @CurrentUser('tenantId') tenantId: string,
     @Query('categoryId') categoryId?: string,
     @Query('categoryKey') categoryKey?: string,
+    // Several admin screens call this with `?category=<key>` instead of
+    // `categoryKey` — accepted as an alias so those callers actually filter.
+    @Query('category') category?: string,
   ) {
-    return this.mastersService.getValues(tenantId, categoryId, categoryKey)
+    return this.mastersService.getValues(tenantId, categoryId, categoryKey || category)
   }
 
   @Post('values')

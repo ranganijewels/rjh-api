@@ -110,6 +110,13 @@ export class OrdersService {
     return this.orderRepo.save(order)
   }
 
+  async setTestFlag(tenantId: string, id: string, isTest: boolean) {
+    const order = await this.orderRepo.findOne({ where: { id, tenantId } })
+    if (!order) throw new NotFoundException(`Order ${id} not found`)
+    order.isTest = isTest
+    return this.orderRepo.save(order)
+  }
+
   async updateStatus(
     tenantId: string,
     id: string,

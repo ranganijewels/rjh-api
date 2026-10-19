@@ -118,7 +118,10 @@ export class FeedService {
       }),
     )
 
-    return items
+    // Only items a shopper can actually see and buy: Meta/Google reject items
+    // without a title, an image or a price, and unnamed drafts are hidden on the
+    // storefront too. Item ids stay equal to the RJH product code.
+    return items.filter((i) => i.title.trim() && i.image_link && parseFloat(i.price) > 0)
   }
 
   // RSS 2.0 feed with the Google Merchant `g:` namespace.

@@ -30,6 +30,15 @@ export class GlobalExceptionFilter implements ExceptionFilter {
       if ((exception as any).code === '23505') {
         message = 'Record already exists (duplicate)'
       }
+    } else if (
+      exception instanceof Error &&
+      ((exception as any).type === 'entity.too.large' || (exception as any).status === 413)
+    ) {
+      // body-parser's PayloadTooLargeError — was falling through to a bare
+      // "Internal server error" 500 with zero indication of what actually
+      // went wrong (e.g. a large CSV bulk-import or base64 image post).
+      status = HttpStatus.PAYLOAD_TOO_LARGE
+      message = 'That request was too large — try a smaller file or fewer rows at once.'
     } else if (exception instanceof Error) {
       this.logger.error(exception.message, exception.stack)
     }

@@ -186,6 +186,17 @@ export class CmsController {
     return this.cmsService.getBlogs(tenantId, { ...dto, tag, adminMode: true })
   }
 
+  @Get('blogs/admin/slug/:slug')
+  @Roles('admin', 'staff')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get a blog post by slug including drafts (admin)' })
+  getBlogAdmin(
+    @CurrentUser('tenantId') tenantId: string,
+    @Param('slug') slug: string,
+  ) {
+    return this.cmsService.getBlog(tenantId, slug, false)
+  }
+
   @Post('blogs')
   @Roles('admin', 'staff')
   @ApiBearerAuth()
@@ -200,13 +211,13 @@ export class CmsController {
 
   @Public()
   @Get('blogs/:slug')
-  @ApiOperation({ summary: 'Get a blog post by slug (public)' })
+  @ApiOperation({ summary: 'Get a published blog post by slug (public)' })
   getBlog(
     @CurrentUser('tenantId') tenantId: string,
     @Headers('x-tenant-id') headerTenantId: string,
     @Param('slug') slug: string,
   ) {
-    return this.cmsService.getBlog(tenantId || headerTenantId, slug)
+    return this.cmsService.getBlog(tenantId || headerTenantId, slug, true)
   }
 
   @Put('blogs/:slug')

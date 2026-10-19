@@ -62,4 +62,31 @@ export class DiamondRateService extends BaseRateService<DiamondRate> {
     const rate = candidates[0] ?? null
     return { rate, perCarat: rate ? Number(rate.rateValue) : 0 }
   }
+
+  // Colours and clarities that have an active rate for this shape + carat —
+  // the choices the storefront can offer, each of which re-prices correctly.
+  async optionsFor(tenantId: string, shape: string | undefined, carat: number, asOf = new Date()) {
+    const rows = await this.repo.find({ where: { tenantId } as any })
+    const split = (v?: string) => String(v || '').split(',').map((x) => x.trim()).filter(Boolean)
+    const shapeOk = (r: DiamondRate) =>
+      !r.shape || split(r.shape).map((x) => x.toLowerCase()).includes(String(shape || '').trim().toLowerCase())
+    const live = rows.filter(
+      (r) =>
+        r.status === 'active' &&
+        (!r.effectiveDate || new Date(r.effectiveDate) <= asOf) &&
+        shapeOk(r) &&
+        carat >= Number(r.minCarat) &&
+        carat <= Number(r.maxCarat),
+    )
+    const COLOR_ORDER = 'DEFGHIJKLMNOPQRSTUVWXYZ'
+    const CLARITY_ORDER = ['FL', 'IF', 'VVS1', 'VVS2', 'VS1', 'VS2', 'SI1', 'SI2', 'SI3', 'I1', 'I2', 'I3']
+    const uniq = (xs: string[]) => [...new Set(xs.map((x) => x.toUpperCase()))]
+    const colors = uniq(live.flatMap((r) => split(r.color))).sort(
+      (a, b) => (COLOR_ORDER.indexOf(a[0]) + 1 || 99) - (COLOR_ORDER.indexOf(b[0]) + 1 || 99) || a.localeCompare(b),
+    )
+    const clarities = uniq(live.flatMap((r) => split(r.clarity))).sort(
+      (a, b) => (CLARITY_ORDER.indexOf(a) + 1 || 99) - (CLARITY_ORDER.indexOf(b) + 1 || 99) || a.localeCompare(b),
+    )
+    return { colors, clarities }
+  }
 }

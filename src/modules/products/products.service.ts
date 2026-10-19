@@ -1,11 +1,12 @@
 import {
   Injectable,
   NotFoundException,
+  ConflictException,
   Logger,
   Optional,
 } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
-import { Repository } from 'typeorm'
+import { Repository, SelectQueryBuilder } from 'typeorm'
 import { ElasticsearchService } from '@nestjs/elasticsearch'
 import { Product } from '../../database/entities/product.entity'
 import { ProductMedia } from '../../database/entities/product-media.entity'
@@ -13,6 +14,81 @@ import { CreateProductDto } from './dto/create-product.dto'
 import { UpdateProductDto } from './dto/update-product.dto'
 import { ProductFilterDto } from './dto/product-filter.dto'
 import { paginate, getSkip } from '../../common/dto/pagination.dto'
+
+const ENGAGEMENT_STYLES = ['solitaire', 'halo', 'hidden halo', 'side stone', 'three stone', 'two stone', 'toi et moi', 'bezel', 'vintage', 'pave', 'bridal']
+const ENGAGEMENT_SQL = `(LOWER(p.category) LIKE 'ring%' AND (
+  LOWER(COALESCE(p.collectionName,'')) LIKE '%engagement%'
+  OR LOWER(p.productName) LIKE '%engagement%'
+  OR LOWER(COALESCE(p.subCategory,'')) SIMILAR TO '%(${ENGAGEMENT_STYLES.join('|')})%'))`
+const WEDDING_SQL = `(LOWER(p.category) LIKE 'wedding%'
+  OR (LOWER(p.category) LIKE 'ring%' AND (
+    LOWER(COALESCE(p.subCategory,'')) SIMILAR TO '%(eternity|wedding|band)%'
+    OR LOWER(COALESCE(p.collectionName,'')) LIKE '%wedding%'
+    OR LOWER(p.productName) SIMILAR TO '%(wedding|eternity|band)%')))`
+
+// Storefront catalogue filters shared by the product list and the menu
+// link-count check, so a menu link and the page it opens always agree.
+export function applyCatalogFilters(qb: SelectQueryBuilder<Product>, dto: Partial<ProductFilterDto>) {
+  const dept = String(dto.department || '').toLowerCase().trim()
+  if (dept === 'engagement') qb.andWhere(ENGAGEMENT_SQL)
+  else if (dept === 'wedding') qb.andWhere(WEDDING_SQL)
+  else if (dept === 'jewellery' || dept === 'jewelry') qb.andWhere(`NOT ${ENGAGEMENT_SQL} AND NOT ${WEDDING_SQL}`)
+
+  if (dto.collection) {
+    qb.andWhere(
+      `(LOWER(TRIM(COALESCE(p.collectionName,''))) = LOWER(TRIM(:collection))
+        OR EXISTS (SELECT 1 FROM jeos_collections c WHERE c.tenant_id = p.tenant_id AND c.status = 'active'
+          AND (LOWER(c.name) = LOWER(TRIM(:collection)) OR c.slug = LOWER(TRIM(:collection)))
+          AND c.product_ids ? p.id::text))`,
+      { collection: dto.collection },
+    )
+  }
+  // Category matches the start of the category or of a word in it:
+  // "ring" → Rings (not Earrings), "necklace" → Necklaces, "bands" → Wedding Bands.
+  if (dto.category) {
+    const c = String(dto.category).trim().replace(/[%_]/g, '')
+    qb.andWhere('(p.category ILIKE :catStart OR p.category ILIKE :catWord)', { catStart: `${c}%`, catWord: `% ${c}%` })
+  }
+  if (dto.subCategory) qb.andWhere('p.subCategory ILIKE :subCategory', { subCategory: `%${String(dto.subCategory).trim()}%` })
+  if (dto.metalType) qb.andWhere('p.metalType ILIKE :metalType', { metalType: `%${String(dto.metalType).trim()}%` })
+  if (dto.metalColor) {
+    // Match the default colour or any colour offered in metadata.metalOptions;
+    // "Two Tone" means a combined colour such as "White/Yellow".
+    const opts = "CASE WHEN jsonb_typeof(p.metadata->'metalOptions') = 'array' THEN p.metadata->'metalOptions' ELSE '[]'::jsonb END"
+    const twoTone = /two[\s-]*tone/i.test(dto.metalColor)
+    qb.andWhere(
+      twoTone
+        ? `(p.metalColor ILIKE '%/%' OR p.metalColor ILIKE '%two%' OR EXISTS (SELECT 1 FROM jsonb_array_elements(${opts}) m, jsonb_array_elements_text(CASE WHEN jsonb_typeof(m->'colors') = 'array' THEN m->'colors' ELSE '[]'::jsonb END) col WHERE col LIKE '%/%'))`
+        : `(p.metalColor ILIKE :metalColor OR EXISTS (SELECT 1 FROM jsonb_array_elements(${opts}) m, jsonb_array_elements_text(CASE WHEN jsonb_typeof(m->'colors') = 'array' THEN m->'colors' ELSE '[]'::jsonb END) col WHERE col ILIKE :metalColor AND col NOT LIKE '%/%'))`,
+      { metalColor: `%${String(dto.metalColor).trim()}%` },
+    )
+  }
+  if (dto.diamondShape) {
+    qb.andWhere('(p.diamondShape ILIKE :diamondShape OR p.centerStoneShape ILIKE :diamondShape)', {
+      diamondShape: `%${String(dto.diamondShape).trim()}%`,
+    })
+  }
+}
+
+const DEPARTMENTS = new Set(['engagement', 'wedding', 'jewellery', 'jewelry'])
+
+// Storefront /product URL params → catalogue filter. Mirrors
+// rj-house-storefront/src/lib/listingParams.js.
+export function listingParamsToFilter(q: URLSearchParams): Partial<ProductFilterDto> {
+  const dto: Partial<ProductFilterDto> = {}
+  const collection = q.get('collection')
+  if (collection) {
+    if (DEPARTMENTS.has(collection.toLowerCase())) dto.department = collection
+    else dto.collection = collection
+  }
+  const category = q.get('category_id') || q.get('category')
+  if (category) dto.category = category
+  if (q.get('subcat')) dto.subCategory = q.get('subcat') as string
+  if (q.get('shape')) dto.diamondShape = q.get('shape') as string
+  if (q.get('metal')) dto.metalColor = q.get('metal') as string
+  if (q.get('search')) dto.search = q.get('search') as string
+  return dto
+}
 
 @Injectable()
 export class ProductsService {
@@ -54,19 +130,25 @@ export class ProductsService {
         { search: `%${dto.search}%` },
       )
     }
-    // Categorical filters use case-insensitive partial match so storefront short codes
-    // (e.g. "YELLOW", "Round") match stored labels (e.g. "Yellow Gold", "Round Brilliant").
-    if (dto.category) qb.andWhere('p.category ILIKE :category', { category: `%${dto.category}%` })
-    if (dto.subCategory) qb.andWhere('p.subCategory ILIKE :subCategory', { subCategory: `%${dto.subCategory}%` })
-    if (dto.metalType) qb.andWhere('p.metalType ILIKE :metalType', { metalType: `%${dto.metalType}%` })
-    if (dto.metalColor) qb.andWhere('p.metalColor ILIKE :metalColor', { metalColor: `%${dto.metalColor}%` })
-    if (dto.diamondShape) qb.andWhere('p.diamondShape ILIKE :diamondShape', { diamondShape: `%${dto.diamondShape}%` })
+    applyCatalogFilters(qb, dto)
     if (dto.status) {
       // 'active' is the storefront canonical value; also match ERP statuses 'Published' and 'Approved'
       const statuses = dto.status.toLowerCase() === 'active'
         ? ['active', 'Published', 'Approved']
         : [dto.status]
       qb.andWhere('p.status IN (:...statuses)', { statuses })
+
+      // A product with zero photos isn't public-ready no matter what its
+      // status says — filtering by "active" is exactly how the storefront
+      // (and an admin's own Status: Active filter) ask for public-ready
+      // products, so require at least one media row too. The admin's
+      // default, unfiltered list is untouched, so a media-less product is
+      // always still findable there to fix.
+      if (dto.status.toLowerCase() === 'active') {
+        qb.andWhere(
+          'EXISTS (SELECT 1 FROM jeos_product_media pm WHERE pm.product_id = p.id)',
+        )
+      }
     }
     // Price is computed by the Pricing Engine from master data (never stored),
     // so price-range filtering is intentionally not a DB column filter here.
@@ -79,6 +161,32 @@ export class ProductsService {
 
     const [data, total] = await qb.getManyAndCount()
     return paginate(data, total, dto)
+  }
+
+  // Number of shopper-visible products behind each storefront listing link
+  // (e.g. "/product?shape=Oval&collection=Engagement"), using exactly the
+  // query-param mapping of the storefront /product page. Lets menus hide
+  // links that would open an empty listing.
+  async countListingLinks(tenantId: string, links: string[]) {
+    const out: Record<string, number> = {}
+    for (const link of links) {
+      if (typeof link !== 'string' || !link.startsWith('/product')) continue
+      const q = new URLSearchParams(link.split('?')[1] || '')
+      const dto: Partial<ProductFilterDto> = listingParamsToFilter(q)
+      const qb = this.productRepo
+        .createQueryBuilder('p')
+        .where('p.tenantId = :tenantId', { tenantId })
+        .andWhere('p.isDeleted = false')
+        .andWhere("(p.parentProductId IS NULL OR p.parentProductId = '')")
+        .andWhere("p.status IN ('active','Published','Approved')")
+        .andWhere('EXISTS (SELECT 1 FROM jeos_product_media pm WHERE pm.product_id = p.id)')
+      if (dto.search) {
+        qb.andWhere('(p.productName ILIKE :search OR p.productCode ILIKE :search)', { search: `%${dto.search}%` })
+      }
+      applyCatalogFilters(qb, dto)
+      out[link] = await qb.getCount()
+    }
+    return out
   }
 
   async findVariants(tenantId: string, parentProductId: string): Promise<Product[]> {
@@ -137,6 +245,7 @@ export class ProductsService {
       .where('p.tenantId = :tenantId', { tenantId })
       .andWhere('p.isDeleted = false')
       .andWhere("p.status = 'active'")
+      .andWhere('EXISTS (SELECT 1 FROM jeos_product_media pm WHERE pm.product_id = p.id)')
       .andWhere("(p.parentProductId IS NULL OR p.parentProductId = '')")
       .andWhere("p.metadata ->> 'designGroup' = :dg", { dg: designGroup })
       .orderBy('p.diamondShape', 'ASC')
@@ -168,11 +277,41 @@ export class ProductsService {
     userId: string,
   ): Promise<Product> {
     const productCode = dto.productCode || `PROD-${Date.now()}`
+
+    // productCode is unique at the DB level even across soft-deleted rows —
+    // without this check, re-using a code from a deleted product hit the raw
+    // Postgres unique-constraint violation (surfaced to the admin as an
+    // opaque "Record already exists (duplicate)"), and the offending row is
+    // invisible via search since deleted products are filtered out of every
+    // list query. Distinguish the two real cases instead: an ACTIVE product
+    // with this code is a genuine conflict (clear error, no silent
+    // overwrite); a SOFT-DELETED one is safe to resurrect under the new
+    // details, same as upsertByCode() already does for CSV re-import.
+    const existing = await this.productRepo.findOne({ where: { tenantId, productCode } })
+    if (existing) {
+      if (!existing.isDeleted) {
+        throw new ConflictException(
+          `A product with design number "${productCode}" already exists.`,
+        )
+      }
+      Object.assign(existing, dto, {
+        productCode,
+        productName: dto.productName ?? '',
+        isDeleted: false,
+        status: dto.status || (dto as any).productStatus || 'active',
+        metalPurity: dto.metalPurity || (dto as any).goldPurity,
+      })
+      const restored = await this.productRepo.save(existing)
+      await this.indexToElasticsearch(restored)
+      return restored
+    }
+
     const product = this.productRepo.create({
       ...dto,
       tenantId,
       createdBy: userId,
       productCode,
+      productName: dto.productName ?? '',
       // Resolve ERP aliases: product_status→status, gold_purity→metalPurity
       status: dto.status || (dto as any).productStatus || 'active',
       metalPurity: dto.metalPurity || (dto as any).goldPurity,
@@ -193,6 +332,34 @@ export class ProductsService {
     const saved = await this.productRepo.save(product)
     await this.indexToElasticsearch(saved)
     return saved
+  }
+
+  // CSV re-import support: `productCode` is unique at the DB level even for
+  // soft-deleted rows, so a plain create() 409s on any code that was ever
+  // used before (including by a product someone has since deleted). This
+  // looks up by code WITHOUT the isDeleted filter — if a row exists (active
+  // or soft-deleted), it's updated in place and restored; otherwise a new
+  // product is created exactly like create().
+  async upsertByCode(
+    tenantId: string,
+    dto: CreateProductDto,
+    userId: string,
+  ): Promise<Product> {
+    const productCode = dto.productCode || `PROD-${Date.now()}`
+    const existing = await this.productRepo.findOne({ where: { tenantId, productCode } })
+    if (existing) {
+      Object.assign(existing, dto, {
+        productCode,
+        productName: dto.productName ?? '',
+        isDeleted: false,
+        status: dto.status || (dto as any).productStatus || existing.status,
+        metalPurity: dto.metalPurity || (dto as any).goldPurity,
+      })
+      const saved = await this.productRepo.save(existing)
+      await this.indexToElasticsearch(saved)
+      return saved
+    }
+    return this.create(tenantId, { ...dto, productCode }, userId)
   }
 
   async softDelete(tenantId: string, id: string): Promise<{ success: boolean }> {
@@ -293,6 +460,7 @@ export class ProductsService {
       metalColor: body.metal_color ?? body.metalColor,
       title: body.title,
       altText: body.alt_text ?? body.altText,
+      seoAltText: body.seo_alt_text ?? body.seoAltText,
     }
   }
 

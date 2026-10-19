@@ -225,7 +225,7 @@ export class SubmissionsController {
     @CurrentUser('tenantId') tenantId: string,
     @Body() dto: any,
   ) {
-    return this.service.create(this.service.contacts, tenantId || headerTenantId, dto)
+    return this.service.createContact(tenantId || headerTenantId, dto)
   }
 
   @Get('contact-submissions')

@@ -48,6 +48,17 @@ export class PricingController {
     return this.engine.calculate(h || T, overrides)
   }
 
+  @Get('pricing/diamond-options/:productId')
+  @Public()
+  @ApiOperation({ summary: 'Diamond colour/clarity choices that have rates for this product (storefront PDP)' })
+  diamondOptions(
+    @Headers('x-tenant-id') h: string,
+    @Param('productId') productId: string,
+    @Query('carat') carat?: string,
+  ) {
+    return this.engine.diamondOptions(h || T, productId, carat ? Number(carat) : undefined)
+  }
+
   // Stateless calculation from raw attributes (no product needed).
   @Post(['calculate-price', 'pricing/calculate-price'])
   @Public()

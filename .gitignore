@@ -24,3 +24,5 @@ coverage/
 
 # Uploaded media (local-disk shim — not source-controlled)
 public/uploads/
+
+OK/

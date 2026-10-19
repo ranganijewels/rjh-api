@@ -54,7 +54,10 @@ import { PricingConfigModule } from './modules/pricing-config/pricing-config.mod
 import { CurrencyModule } from './modules/currency/currency.module'
 import { PricingModule } from './modules/pricing/pricing.module'
 import { ChatModule } from './modules/chat/chat.module'
+import { PaymentsModule } from './modules/payments/payments.module'
 import { InstagramModule } from './modules/instagram/instagram.module'
+import { MarketingModule } from './modules/marketing/marketing.module'
+import { AiCopyModule } from './modules/ai-copy/ai-copy.module'
 import { HealthController } from './health/health.controller'
 
 // Guards & Interceptors
@@ -120,6 +123,7 @@ import { AuditService } from './modules/audit/audit.service'
     PricingConfigModule,
     CurrencyModule,
     PricingModule,
+    AiCopyModule,
     CatalogModule,
     EventsModule,
     SearchModule,
@@ -134,6 +138,8 @@ import { AuditService } from './modules/audit/audit.service'
     ReviewsModule,
     ChatModule,
     InstagramModule,
+    MarketingModule,
+    PaymentsModule,
   ],
   controllers: [HealthController],
   providers: [

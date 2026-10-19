@@ -89,12 +89,6 @@ export class CouponsService {
   }
 
   async incrementUse(tenantId: string, code: string) {
-    await this.repo
-      .createQueryBuilder()
-      .update(Coupon)
-      .set({ usedCount: () => 'used_count + 1' })
-      .where('tenantId = :tenantId', { tenantId })
-      .andWhere('code = :code', { code: code.toUpperCase() })
-      .execute()
+    await this.repo.increment({ tenantId, code: code.toUpperCase() } as any, 'usedCount', 1)
   }
 }

@@ -3,9 +3,10 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
 import { Type, Transform } from 'class-transformer'
 
 export class CreateProductDto {
-  @ApiProperty({ description: 'Product display name' })
+  @ApiPropertyOptional({ description: 'Product display name' })
+  @IsOptional()
   @IsString()
-  productName: string
+  productName?: string
 
   @ApiPropertyOptional()
   @IsOptional()

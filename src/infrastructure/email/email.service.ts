@@ -59,9 +59,11 @@ export class EmailService {
       paymentMethod?: string
       productName?: string
       shippingAddress?: string
+      lines?: Array<{ name: string; quantity: number; specs: string[]; dispatch?: string }>
     },
   ): Promise<void> {
     if (!to) return
+    const esc = (v: any) => String(v ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c] as string)
     const subject = `Your Rangani order is confirmed — ${orderNumber}`
     const money =
       details?.total != null
@@ -69,7 +71,7 @@ export class EmailService {
         : ''
     const rows = [
       ['Order number', orderNumber],
-      details?.productName ? ['Item', details.productName] : null,
+      details?.productName && !details?.lines?.length ? ['Item', details.productName] : null,
       money ? ['Total', money] : null,
       details?.paymentMethod ? ['Payment', details.paymentMethod.toUpperCase()] : null,
       details?.shippingAddress ? ['Ship to', details.shippingAddress] : null,
@@ -78,7 +80,17 @@ export class EmailService {
     const rowsHtml = rows
       .map(
         ([k, v]) =>
-          `<tr><td style="padding:6px 0;color:#6b7280;">${k}</td><td style="padding:6px 0;text-align:right;color:#111827;font-weight:600;">${v}</td></tr>`,
+          `<tr><td style="padding:6px 0;color:#6b7280;">${k}</td><td style="padding:6px 0;text-align:right;color:#111827;font-weight:600;">${esc(v)}</td></tr>`,
+      )
+      .join('')
+    const linesHtml = (details?.lines || [])
+      .map(
+        (l) =>
+          `<div style="padding:10px 0;border-top:1px solid #e5e7eb;font-family:Arial,sans-serif;font-size:14px;">
+            <div style="font-weight:600;">${esc(l.name)} × ${esc(l.quantity)}</div>
+            ${l.specs.length ? `<div style="color:#6b7280;font-size:13px;">${l.specs.map(esc).join(' · ')}</div>` : ''}
+            ${l.dispatch ? `<div style="color:#374151;font-size:13px;">Dispatched within ${esc(l.dispatch)}</div>` : ''}
+          </div>`,
       )
       .join('')
 
@@ -97,14 +109,20 @@ export class EmailService {
           <table style="width:100%;border-collapse:collapse;margin:20px 0;font-family:Arial,sans-serif;font-size:14px;">
             ${rowsHtml}
           </table>
+          ${linesHtml}
+          <p style="color:#374151;font-size:13px;line-height:1.6;margin-top:16px;">
+            Your order will be made, certified and dispatched within the time shown above
+            (5–6 business days unless stated). Delivery to the US and Canada typically takes a
+            further 4–5 business days. Import duties and taxes, where charged, are paid by the customer.
+          </p>
           <p style="color:#6b7280;font-size:13px;line-height:1.6;">
-            Every Rangani piece is IGI/GIA certified, BIS hallmarked, and backed by our
-            lifetime craftsmanship warranty and 30-day easy returns.
+            Your piece is covered by our lifetime warranty against manufacturing defects, and
+            eligible items can be returned within 14 days of delivery (return shipping paid by the customer).
           </p>
           <p style="margin-top:24px;">With gratitude,<br/><strong>The Rangani Jewelry House Team</strong></p>
         </div>
         <div style="background:#f3f4f6;padding:16px 32px;text-align:center;color:#9ca3af;font-size:12px;font-family:Arial,sans-serif;">
-          Need help? Reply to this email or contact support@therjhouse.com
+          Need help? Reply to this email or contact info@ranganijewelry.com
         </div>
       </div>
     `

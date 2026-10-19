@@ -1,14 +1,39 @@
 import { Injectable, NotFoundException } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
-import { Repository } from 'typeorm'
+import { Repository, SelectQueryBuilder } from 'typeorm'
 import { SeoPage } from '../../database/entities/seo-page.entity'
+import { Collection } from '../../database/entities/collection.entity'
+import { CmsBlog } from '../../database/entities/cms-blog.entity'
 import { SeoRedirect } from '../../database/entities/seo-redirect.entity'
 import { PricingEngineService } from '../pricing/services/pricing-engine.service'
 import { Product } from '../../database/entities/product.entity'
 import { CatalogMaster } from '../../database/entities/catalog-master.entity'
+import { defaultTokenContext, resolveTokens } from '../../common/utils/resolve-tokens.util'
 
 const BRAND = 'Rangani Jewelry House'
-const SITE = process.env.SITE_URL || 'https://ranganijewelry.com'
+const SITE = (process.env.SITE_URL || 'https://www.ranganijewelry.com').replace(/\/+$/, '')
+
+// Owner-confirmed metal assortment (10K/14K/18K gold, 925 silver). Metal facet
+// pages for anything else are unpublished by reconcileFacetPages().
+const APPROVED_FACET_METALS = ['gold', 'silver']
+
+const SHAPE_NOTES: Record<string, string> = {
+  round: 'The round brilliant has the most facets of any shape and is cut for maximum sparkle — the classic solitaire choice.',
+  oval: 'Ovals carry the brilliance of a round in an elongated outline that can make the finger look longer and the stone look larger for its weight.',
+  princess: 'The princess cut is a square brilliant with crisp corners, best protected by prongs set at each point.',
+  cushion: 'Cushion cuts pair softly rounded corners with large facets for a romantic, vintage-leaning glow.',
+  emerald: 'Emerald cuts use long step facets that show clarity and produce broad flashes of light rather than scattered sparkle.',
+  pear: 'The pear combines a rounded end with a single point, worn point-down to lengthen the hand.',
+  marquise: 'The marquise has the longest outline of the classic shapes, so it appears large for its carat weight.',
+  radiant: 'Radiant cuts combine the clean outline of an emerald with brilliant faceting for a lively, modern look.',
+  asscher: 'The Asscher is a square step cut with cropped corners, known for its layered "hall of mirrors" look.',
+  heart: 'Heart shapes need precise cutting to keep both lobes symmetrical — a romantic statement centre stone.',
+}
+
+const METAL_NOTES: Record<string, string> = {
+  gold: 'Choose the gold karat and colour (yellow, white or rose) offered on each design — the karat changes durability, colour and price, and each design is priced live for the option you select.',
+  silver: 'Our silver settings are 925 sterling silver, a lighter-budget way to wear a certified lab-grown diamond while keeping the same design.',
+}
 
 @Injectable()
 export class SeoService {
@@ -22,6 +47,10 @@ export class SeoService {
     private readonly pricingEngine: PricingEngineService,
     @InjectRepository(CatalogMaster)
     private readonly masters: Repository<CatalogMaster>,
+    @InjectRepository(Collection)
+    private readonly collections: Repository<Collection>,
+    @InjectRepository(CmsBlog)
+    private readonly blogs: Repository<CmsBlog>,
   ) {}
 
   // ─── Pages CRUD ─────────────────────────────────────────────────────────────
@@ -64,7 +93,10 @@ export class SeoService {
     const page = await this.pages.findOne({
       where: { tenantId, urlSlug: clean, status: 'published' },
     })
-    if (page) return { kind: 'page', page }
+    if (page) {
+      const products = page.type === 'facet' ? await this.facetProducts(tenantId, page, 24) : []
+      return { kind: 'page', page, products }
+    }
 
     const redirect = await this.redirects.findOne({
       where: { tenantId, fromSlug: clean },
@@ -147,6 +179,120 @@ export class SeoService {
     return { generated: count, base }
   }
 
+  // ─── Facet inventory ────────────────────────────────────────────────────────
+
+  // Parse "carat:2|shape:Round Brilliant" / "metal:Gold" into a filter.
+  private parseFacet(ref: string) {
+    const out: { carat?: number; shape?: string; metal?: string } = {}
+    for (const part of String(ref || '').split('|')) {
+      const [k, ...rest] = part.split(':')
+      const v = rest.join(':').trim()
+      if (!v) continue
+      if (k === 'carat' && Number.isFinite(Number(v))) out.carat = Number(v)
+      if (k === 'shape') out.shape = v
+      if (k === 'metal') out.metal = v
+    }
+    return out
+  }
+
+  // Purchasable products matching a facet page: active, has media, an
+  // engagement ring, and offering the facet's shape / carat band / metal.
+  private facetQuery(tenantId: string, page: SeoPage): SelectQueryBuilder<Product> {
+    const f = this.parseFacet(page.targetRef)
+    const qb = this.products
+      .createQueryBuilder('p')
+      .where('p.tenant_id = :tenantId', { tenantId })
+      .andWhere('p.is_deleted = false')
+      .andWhere("p.status = 'active'")
+      .andWhere("COALESCE(TRIM(p.product_name), '') <> ''")
+      .andWhere('EXISTS (SELECT 1 FROM jeos_product_media pm WHERE pm.product_id = p.id)')
+      .andWhere("LOWER(p.category) LIKE 'ring%'")
+      .andWhere(
+        "(LOWER(COALESCE(p.collection_name,'')) LIKE '%engagement%' OR LOWER(COALESCE(p.sub_category,'')) LIKE '%solitaire%' OR LOWER(COALESCE(p.sub_category,'')) LIKE '%engagement%' OR LOWER(p.product_name) LIKE '%engagement%')",
+      )
+    if (f.shape) {
+      // "Round Brilliant" facet should match products stored as "Round".
+      const word = f.shape.toLowerCase().split(/\s+/)[0]
+      qb.andWhere(
+        "(LOWER(COALESCE(p.center_stone_shape, p.diamond_shape, '')) LIKE :shape)",
+        { shape: `${word}%` },
+      )
+    }
+    if (f.carat != null) {
+      const arr = "CASE WHEN jsonb_typeof(p.metadata->'weightMatrix') = 'array' THEN p.metadata->'weightMatrix' ELSE '[]'::jsonb END"
+      qb.andWhere(
+        `(EXISTS (SELECT 1 FROM jsonb_array_elements(${arr}) w WHERE (w->>'carat') ~ '^[0-9.]+$' AND (w->>'carat')::numeric >= :lo AND (w->>'carat')::numeric < :hi)
+          OR (COALESCE(p.center_stone_weight_ct, 0) >= :lo AND COALESCE(p.center_stone_weight_ct, 0) < :hi))`,
+        { lo: f.carat, hi: f.carat + 1 },
+      )
+    }
+    if (f.metal) {
+      const arr = "CASE WHEN jsonb_typeof(p.metadata->'metalOptions') = 'array' THEN p.metadata->'metalOptions' ELSE '[]'::jsonb END"
+      qb.andWhere(
+        `(LOWER(COALESCE(p.metal_type,'')) = LOWER(:metal) OR EXISTS (SELECT 1 FROM jsonb_array_elements(${arr}) m WHERE LOWER(m->>'type') = LOWER(:metal)))`,
+        { metal: f.metal },
+      )
+    }
+    return qb
+  }
+
+  async facetProducts(tenantId: string, page: SeoPage, limit = 24) {
+    return this.facetQuery(tenantId, page).orderBy('p.created_at', 'DESC').take(limit).getMany()
+  }
+
+  private facetIntro(page: SeoPage, count: number): string {
+    const f = this.parseFacet(page.targetRef)
+    const shapeKey = (f.shape || '').toLowerCase().split(/\s+/)[0]
+    if (f.metal) {
+      const metal = this.titleCase(f.metal)
+      return `${metal} lab-grown diamond engagement rings from ${BRAND}. ${METAL_NOTES[f.metal.toLowerCase()] || ''} `
+        + `There ${count === 1 ? 'is 1 design' : `are ${count} designs`} here today; every centre diamond's colour and clarity can be chosen on the product page, and the price updates as you choose.`
+    }
+    const shape = this.titleCase(f.shape || '')
+    return `Engagement rings that can be made with a ${f.carat}-carat ${shape.toLowerCase()} lab-grown centre diamond. `
+      + `${SHAPE_NOTES[shapeKey] || ''} `
+      + `${count === 1 ? 'This design' : `Each of these ${count} designs`} can be configured in your preferred gold or silver, with the diamond's carat, colour and clarity selected on the product page and priced live.`
+  }
+
+  // Keep facet landing pages honest: unpublish + noindex facets with no
+  // purchasable inventory (or outside the approved metal assortment), and give
+  // the remaining ones unique intro copy. Never deletes rows.
+  async reconcileFacetPages(tenantId: string) {
+    const rows = await this.pages.find({ where: { tenantId, type: 'facet' } })
+    const report: Array<{ slug: string; products: number; action: string }> = []
+    for (const page of rows) {
+      const f = this.parseFacet(page.targetRef)
+      const count = await this.facetQuery(tenantId, page).getCount()
+      const unsupportedMetal = !!f.metal && !APPROVED_FACET_METALS.includes(f.metal.toLowerCase())
+      if (count === 0 || unsupportedMetal) {
+        if (page.status !== 'draft' || page.indexable) {
+          page.status = 'draft'
+          page.indexable = false
+          await this.pages.save(page)
+        }
+        report.push({ slug: page.urlSlug, products: count, action: unsupportedMetal ? 'unpublished (metal not in assortment)' : 'unpublished (no inventory)' })
+        continue
+      }
+      let changed = false
+      if (page.status !== 'published' || !page.indexable) {
+        page.status = 'published'
+        page.indexable = true
+        changed = true
+      }
+      if (!page.introMd?.trim()) {
+        page.introMd = this.facetIntro(page, count)
+        changed = true
+      }
+      if (page.canonicalTo && page.canonicalTo.trim() === '') page.canonicalTo = null as any
+      if (changed) {
+        page.lastmod = new Date()
+        await this.pages.save(page)
+      }
+      report.push({ slug: page.urlSlug, products: count, action: changed ? 'published + intro' : 'ok' })
+    }
+    return { total: rows.length, published: report.filter((r) => !r.action.startsWith('unpublished')).length, report }
+  }
+
   // ─── schema.org Product + Offer JSON-LD ─────────────────────────────────────
 
   async schemaForProduct(tenantId: string, productId: string) {
@@ -193,20 +339,34 @@ export class SeoService {
       .filter(Boolean)
       .join(' ')
 
+    // JSON-LD is crawled server-side once per page load — there's no live
+    // shopper selection to react to here (unlike the storefront's on-page
+    // text), so any {{token}} in admin-authored copy resolves against the
+    // product's default/first metal-and-diamond option.
+    const tokenCtx = defaultTokenContext(product)
+    const resolvedName =
+      resolveTokens(product.seoTitle || product.productName, tokenCtx)?.trim()
+      || fallbackProductName(product)
+    const resolvedDescription =
+      resolveTokens(
+        product.seoDescription
+        || product.shortDescription
+        || product.description
+        || product.longDescription
+        || '',
+        tokenCtx,
+      )?.trim()
+      || fallbackProductDescription(product, resolvedName)
+
     const schema: Record<string, any> = {
       '@context': 'https://schema.org/',
       '@type': 'Product',
       '@id': url,
       url,
-      name: product.seoTitle || product.productName,
+      name: resolvedName,
       sku: product.productCode || product.shopifySku || product.id,
       mpn: product.productCode || product.id,
-      description:
-        product.seoDescription
-        || product.shortDescription
-        || product.description
-        || product.longDescription
-        || product.productName,
+      description: resolvedDescription,
       brand: { '@type': 'Brand', name: md.brand || BRAND },
       itemCondition: 'https://schema.org/NewCondition',
       offers: {
@@ -258,22 +418,93 @@ export class SeoService {
     addProp('Net Weight (g)', product.netWeightG)
     if (props.length) schema.additionalProperty = props
 
-    return schema
+    // GEO/AEO: per-product FAQs (admin/AI-authored, metadata.faqs) surfaced as
+    // real FAQPage structured data — resolving any tokens the same way as above.
+    const faqs: Array<{ question?: string; answer?: string }> = Array.isArray(md.faqs) ? md.faqs : []
+    const faqEntities = faqs
+      .filter((f) => f?.question && f?.answer)
+      .map((f) => ({
+        '@type': 'Question',
+        name: resolveTokens(f.question, tokenCtx),
+        acceptedAnswer: {
+          '@type': 'Answer',
+          text: resolveTokens(f.answer, tokenCtx),
+        },
+      }))
+
+    if (!faqEntities.length) return schema
+
+    const { '@context': _drop, ...productNode } = schema
+    return {
+      '@context': 'https://schema.org/',
+      '@graph': [
+        productNode,
+        {
+          '@type': 'FAQPage',
+          '@id': `${url}#faq`,
+          mainEntity: faqEntities,
+        },
+      ],
+    }
   }
 
 
   // ─── Sitemap ────────────────────────────────────────────────────────────────
 
+  // Every indexable storefront URL the API knows about, as site-relative
+  // paths: SEO landing pages and collections (both served at /collections/:slug),
+  // live products and published blog posts. Static routes are added by the
+  // storefront's sitemap.xml route.
   async sitemap(tenantId: string) {
-    const rows = await this.pages.find({
+    const out: Array<{ loc: string; lastmod: Date | null; priority: number }> = []
+    const seen = new Set<string>()
+    const push = (loc: string, lastmod: any, priority: number) => {
+      if (seen.has(loc)) return
+      seen.add(loc)
+      out.push({ loc, lastmod: lastmod ?? null, priority })
+    }
+
+    const cols = await this.collections.find({ where: { tenantId, status: 'active' } as any })
+    for (const c of cols) {
+      const live = await this.products
+        .createQueryBuilder('p')
+        .where('p.tenant_id = :tenantId', { tenantId })
+        .andWhere('p.is_deleted = false')
+        .andWhere("p.status = 'active'")
+        .andWhere('EXISTS (SELECT 1 FROM jeos_product_media pm WHERE pm.product_id = p.id)')
+        .andWhere(
+          Array.isArray(c.productIds) && c.productIds.length
+            ? '(p.id IN (:...ids) OR LOWER(p.collection_name) = LOWER(:cname))'
+            : 'LOWER(p.collection_name) = LOWER(:cname)',
+          { ids: c.productIds, cname: c.name },
+        )
+        .getCount()
+      if (live > 0) push(`/collections/${c.slug}`, c.updatedAt, 0.8)
+    }
+
+    const pages = await this.pages.find({
       where: { tenantId, indexable: true, status: 'published' },
       order: { priority: 'DESC' },
     })
-    return rows.map((p) => ({
-      loc: p.urlSlug,
-      lastmod: (p.lastmod || p.updatedAt || p.createdAt) ?? null,
-      priority: Number(p.priority),
-    }))
+    for (const p of pages) {
+      push(`/collections/${this.normalizeSlug(p.urlSlug)}`, p.lastmod || p.updatedAt || p.createdAt, Number(p.priority) || 0.5)
+    }
+
+    const live = await this.products
+      .createQueryBuilder('p')
+      .select(['p.id', 'p.updatedAt'])
+      .where('p.tenant_id = :tenantId', { tenantId })
+      .andWhere('p.is_deleted = false')
+      .andWhere("p.status = 'active'")
+      .andWhere("COALESCE(TRIM(p.product_name), '') <> ''")
+      .andWhere('EXISTS (SELECT 1 FROM jeos_product_media pm WHERE pm.product_id = p.id)')
+      .getMany()
+    for (const p of live) push(`/product/${p.id}`, p.updatedAt, 0.6)
+
+    const blogs = await this.blogs.find({ where: { tenantId, isPublished: true } as any })
+    for (const b of blogs) push(`/blog/${b.slug}`, b.updatedAt || b.publishedAt, 0.5)
+
+    return out
   }
 
   // ─── Redirects ──────────────────────────────────────────────────────────────
@@ -345,4 +576,22 @@ export class SeoService {
   private titleFromSlug(slug: string): string {
     return this.titleCase((slug || '').replace(/-/g, ' '))
   }
+}
+
+// A product with no admin-entered name still needs a truthful title wherever
+// it is shown (PDP h1, <title>, Product schema): build one from its attributes.
+export function fallbackProductName(p: Partial<Product>): string {
+  const shape = (p as any).centerStoneShape || p.diamondShape
+  const category = (p.category || 'Jewelry').replace(/s$/i, '')
+  const parts = [shape, 'Lab-Grown Diamond', category].filter(Boolean)
+  const code = p.productCode ? ` ${p.productCode}` : ''
+  return `${parts.join(' ')}${code}`.trim()
+}
+
+export function fallbackProductDescription(p: Partial<Product>, name: string): string {
+  const metals = Array.isArray((p.metadata as any)?.metalOptions)
+    ? ((p.metadata as any).metalOptions as any[]).map((m) => m?.type).filter(Boolean)
+    : [p.metalType].filter(Boolean)
+  const metalText = metals.length ? ` Available in ${[...new Set(metals)].join(' and ').toLowerCase()}.` : ''
+  return `${name} by ${BRAND}, set with lab-grown diamonds.${metalText}`
 }

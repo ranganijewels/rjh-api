@@ -1,5 +1,5 @@
 import { NotFoundException } from '@nestjs/common'
-import { Repository, ObjectLiteral } from 'typeorm'
+import { Repository, ObjectLiteral, In } from 'typeorm'
 
 // Shared CRUD for effective-dated master tables. Concrete services inject their
 // repository and add domain-specific resolution. History is preserved by NEVER
@@ -59,6 +59,16 @@ export abstract class BaseRateService<T extends ObjectLiteral & { id: string; te
     const row = await this.get(tenantId, id)
     await this.repo.remove(row)
     return { success: true }
+  }
+
+  // One DB round-trip instead of the admin firing off one DELETE request per
+  // selected row — with a big selection (hundreds+) that used to fan out into
+  // that many concurrent requests, which reliably exhausted the connection
+  // pool, failed silently, and never even refreshed the list to show it.
+  async bulkRemove(tenantId: string, ids: string[]): Promise<{ deleted: number }> {
+    if (!ids?.length) return { deleted: 0 }
+    const result = await this.repo.delete({ tenantId, id: In(ids) } as any)
+    return { deleted: result.affected ?? 0 }
   }
 
   // Resolve the latest active row whose effectiveDate <= asOf, among candidates

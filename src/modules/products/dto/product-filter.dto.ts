@@ -9,6 +9,16 @@ export class ProductFilterDto extends PaginationDto {
   @IsString()
   category?: string
 
+  @ApiPropertyOptional({ description: 'Storefront department: engagement | wedding | jewellery' })
+  @IsOptional()
+  @IsString()
+  department?: string
+
+  @ApiPropertyOptional({ description: 'Product collection name (collection_name or an admin Collection)' })
+  @IsOptional()
+  @IsString()
+  collection?: string
+
   @ApiPropertyOptional({ description: 'Filter by sub-category / style (e.g. "Halo", "Solitaire")' })
   @IsOptional()
   @IsString()

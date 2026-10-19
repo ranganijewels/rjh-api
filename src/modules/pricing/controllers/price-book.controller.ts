@@ -49,6 +49,19 @@ export class PriceBookController {
     return r
   }
 
+  @Post('bulk-delete')
+  @Roles('admin', 'super_admin')
+  @ApiBearerAuth()
+  async bulkDelete(
+    @CurrentUser('tenantId') u: string,
+    @Headers('x-tenant-id') h: string,
+    @Body() body: any,
+  ) {
+    const r = await this.svc.bulkRemove(tn(u, h), body.ids)
+    this.engine.invalidateCache()
+    return r
+  }
+
   @Post()
   @Roles(...WRITE)
   @ApiBearerAuth()

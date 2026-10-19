@@ -37,6 +37,16 @@ export class CollectionsController {
     return this.collections.getBySlug(tenantId, slug)
   }
 
+  @Get('by-name/:name/variants')
+  @Public()
+  @ApiOperation({ summary: 'Storefront PDP: sibling products in the same variant-mode collection' })
+  variantSiblings(
+    @Headers('x-tenant-id') tenantId: string,
+    @Param('name') name: string,
+  ) {
+    return this.collections.getVariantSiblings(tenantId, decodeURIComponent(name))
+  }
+
   @Get(':id')
   @Roles('staff', 'manager', 'admin', 'super_admin')
   @ApiOperation({ summary: 'Get a collection with all member products (admin)' })

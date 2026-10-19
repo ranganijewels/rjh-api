@@ -124,6 +124,18 @@ export class OrdersController {
     return this.ordersService.updateStatus(tenantId, id, body, userId)
   }
 
+  // Mark / unmark a staff or QA order as a test order (excluded from reporting).
+  @Patch(':id/test')
+  @Roles('manager')
+  @ApiOperation({ summary: 'Flag an order as a test order (excluded from revenue/reporting)' })
+  setTest(
+    @Headers('x-tenant-id') tenantId: string,
+    @Param('id') id: string,
+    @Body('isTest') isTest: boolean,
+  ) {
+    return this.ordersService.setTestFlag(tenantId, id, !!isTest)
+  }
+
   @Post(':id/job-card')
   @Roles('staff')
   @HttpCode(HttpStatus.CREATED)

@@ -54,6 +54,11 @@ abstract class RateCrud<S extends BaseRateService<any>> {
     this.engine.invalidateCache()
     return r
   }
+  protected async doBulkRemove(u: string, h: string, ids: string[]) {
+    const r = await this.service.bulkRemove(tn(u, h), ids ?? [])
+    this.engine.invalidateCache()
+    return r
+  }
 }
 
 @ApiTags('pricing-masters')
@@ -64,6 +69,7 @@ export class MetalRateController extends RateCrud<MetalRateService> {
   @Get() @Public() list(@Headers('x-tenant-id') h: string, @Query('active') a?: string) { return this.doList(h, a) }
   @Get(':id') @Public() get(@Headers('x-tenant-id') h: string, @Param('id') id: string) { return this.doGet(h, id) }
   @Post('bulk') @Roles('admin', 'manager', 'super_admin') @ApiBearerAuth() bulk(@CurrentUser('tenantId') u: string, @CurrentUser('id') uid: string, @Headers('x-tenant-id') h: string, @Body() b: any) { return this.doBulk(u, uid, h, b.items) }
+  @Post('bulk-delete') @Roles('admin', 'super_admin') @ApiBearerAuth() bulkDelete(@CurrentUser('tenantId') u: string, @Headers('x-tenant-id') h: string, @Body() b: any) { return this.doBulkRemove(u, h, b.ids) }
   @Post() @Roles('admin', 'manager', 'super_admin') @ApiBearerAuth() create(@CurrentUser('tenantId') u: string, @CurrentUser('id') uid: string, @Headers('x-tenant-id') h: string, @Body() d: any) { return this.doCreate(u, uid, h, d) }
   @Put(':id') @Roles('admin', 'manager', 'super_admin') @ApiBearerAuth() update(@CurrentUser('tenantId') u: string, @Headers('x-tenant-id') h: string, @Param('id') id: string, @Body() d: any) { return this.doUpdate(u, h, id, d) }
   @Delete(':id') @Roles('admin', 'super_admin') @ApiBearerAuth() remove(@CurrentUser('tenantId') u: string, @Headers('x-tenant-id') h: string, @Param('id') id: string) { return this.doRemove(u, h, id) }
@@ -77,6 +83,7 @@ export class DiamondRateController extends RateCrud<DiamondRateService> {
   @Get() @Public() list(@Headers('x-tenant-id') h: string, @Query('active') a?: string) { return this.doList(h, a) }
   @Get(':id') @Public() get(@Headers('x-tenant-id') h: string, @Param('id') id: string) { return this.doGet(h, id) }
   @Post('bulk') @Roles('admin', 'manager', 'super_admin') @ApiBearerAuth() bulk(@CurrentUser('tenantId') u: string, @CurrentUser('id') uid: string, @Headers('x-tenant-id') h: string, @Body() b: any) { return this.doBulk(u, uid, h, b.items) }
+  @Post('bulk-delete') @Roles('admin', 'super_admin') @ApiBearerAuth() bulkDelete(@CurrentUser('tenantId') u: string, @Headers('x-tenant-id') h: string, @Body() b: any) { return this.doBulkRemove(u, h, b.ids) }
   @Post() @Roles('admin', 'manager', 'super_admin') @ApiBearerAuth() create(@CurrentUser('tenantId') u: string, @CurrentUser('id') uid: string, @Headers('x-tenant-id') h: string, @Body() d: any) { return this.doCreate(u, uid, h, d) }
   @Put(':id') @Roles('admin', 'manager', 'super_admin') @ApiBearerAuth() update(@CurrentUser('tenantId') u: string, @Headers('x-tenant-id') h: string, @Param('id') id: string, @Body() d: any) { return this.doUpdate(u, h, id, d) }
   @Delete(':id') @Roles('admin', 'super_admin') @ApiBearerAuth() remove(@CurrentUser('tenantId') u: string, @Headers('x-tenant-id') h: string, @Param('id') id: string) { return this.doRemove(u, h, id) }
@@ -90,6 +97,7 @@ export class LaborRateController extends RateCrud<LaborRateService> {
   @Get() @Public() list(@Headers('x-tenant-id') h: string, @Query('active') a?: string) { return this.doList(h, a) }
   @Get(':id') @Public() get(@Headers('x-tenant-id') h: string, @Param('id') id: string) { return this.doGet(h, id) }
   @Post('bulk') @Roles('admin', 'manager', 'super_admin') @ApiBearerAuth() bulk(@CurrentUser('tenantId') u: string, @CurrentUser('id') uid: string, @Headers('x-tenant-id') h: string, @Body() b: any) { return this.doBulk(u, uid, h, b.items) }
+  @Post('bulk-delete') @Roles('admin', 'super_admin') @ApiBearerAuth() bulkDelete(@CurrentUser('tenantId') u: string, @Headers('x-tenant-id') h: string, @Body() b: any) { return this.doBulkRemove(u, h, b.ids) }
   @Post() @Roles('admin', 'manager', 'super_admin') @ApiBearerAuth() create(@CurrentUser('tenantId') u: string, @CurrentUser('id') uid: string, @Headers('x-tenant-id') h: string, @Body() d: any) { return this.doCreate(u, uid, h, d) }
   @Put(':id') @Roles('admin', 'manager', 'super_admin') @ApiBearerAuth() update(@CurrentUser('tenantId') u: string, @Headers('x-tenant-id') h: string, @Param('id') id: string, @Body() d: any) { return this.doUpdate(u, h, id, d) }
   @Delete(':id') @Roles('admin', 'super_admin') @ApiBearerAuth() remove(@CurrentUser('tenantId') u: string, @Headers('x-tenant-id') h: string, @Param('id') id: string) { return this.doRemove(u, h, id) }
@@ -103,6 +111,7 @@ export class TaxRateController extends RateCrud<TaxRateService> {
   @Get() @Public() list(@Headers('x-tenant-id') h: string, @Query('active') a?: string) { return this.doList(h, a) }
   @Get(':id') @Public() get(@Headers('x-tenant-id') h: string, @Param('id') id: string) { return this.doGet(h, id) }
   @Post('bulk') @Roles('admin', 'manager', 'super_admin') @ApiBearerAuth() bulk(@CurrentUser('tenantId') u: string, @CurrentUser('id') uid: string, @Headers('x-tenant-id') h: string, @Body() b: any) { return this.doBulk(u, uid, h, b.items) }
+  @Post('bulk-delete') @Roles('admin', 'super_admin') @ApiBearerAuth() bulkDelete(@CurrentUser('tenantId') u: string, @Headers('x-tenant-id') h: string, @Body() b: any) { return this.doBulkRemove(u, h, b.ids) }
   @Post() @Roles('admin', 'manager', 'super_admin') @ApiBearerAuth() create(@CurrentUser('tenantId') u: string, @CurrentUser('id') uid: string, @Headers('x-tenant-id') h: string, @Body() d: any) { return this.doCreate(u, uid, h, d) }
   @Put(':id') @Roles('admin', 'manager', 'super_admin') @ApiBearerAuth() update(@CurrentUser('tenantId') u: string, @Headers('x-tenant-id') h: string, @Param('id') id: string, @Body() d: any) { return this.doUpdate(u, h, id, d) }
   @Delete(':id') @Roles('admin', 'super_admin') @ApiBearerAuth() remove(@CurrentUser('tenantId') u: string, @Headers('x-tenant-id') h: string, @Param('id') id: string) { return this.doRemove(u, h, id) }
@@ -116,6 +125,7 @@ export class ShippingRateController extends RateCrud<ShippingRateService> {
   @Get() @Public() list(@Headers('x-tenant-id') h: string, @Query('active') a?: string) { return this.doList(h, a) }
   @Get(':id') @Public() get(@Headers('x-tenant-id') h: string, @Param('id') id: string) { return this.doGet(h, id) }
   @Post('bulk') @Roles('admin', 'manager', 'super_admin') @ApiBearerAuth() bulk(@CurrentUser('tenantId') u: string, @CurrentUser('id') uid: string, @Headers('x-tenant-id') h: string, @Body() b: any) { return this.doBulk(u, uid, h, b.items) }
+  @Post('bulk-delete') @Roles('admin', 'super_admin') @ApiBearerAuth() bulkDelete(@CurrentUser('tenantId') u: string, @Headers('x-tenant-id') h: string, @Body() b: any) { return this.doBulkRemove(u, h, b.ids) }
   @Post() @Roles('admin', 'manager', 'super_admin') @ApiBearerAuth() create(@CurrentUser('tenantId') u: string, @CurrentUser('id') uid: string, @Headers('x-tenant-id') h: string, @Body() d: any) { return this.doCreate(u, uid, h, d) }
   @Put(':id') @Roles('admin', 'manager', 'super_admin') @ApiBearerAuth() update(@CurrentUser('tenantId') u: string, @Headers('x-tenant-id') h: string, @Param('id') id: string, @Body() d: any) { return this.doUpdate(u, h, id, d) }
   @Delete(':id') @Roles('admin', 'super_admin') @ApiBearerAuth() remove(@CurrentUser('tenantId') u: string, @Headers('x-tenant-id') h: string, @Param('id') id: string) { return this.doRemove(u, h, id) }
@@ -129,6 +139,7 @@ export class AdditionalChargeController extends RateCrud<AdditionalChargeService
   @Get() @Public() list(@Headers('x-tenant-id') h: string, @Query('active') a?: string) { return this.doList(h, a) }
   @Get(':id') @Public() get(@Headers('x-tenant-id') h: string, @Param('id') id: string) { return this.doGet(h, id) }
   @Post('bulk') @Roles('admin', 'manager', 'super_admin') @ApiBearerAuth() bulk(@CurrentUser('tenantId') u: string, @CurrentUser('id') uid: string, @Headers('x-tenant-id') h: string, @Body() b: any) { return this.doBulk(u, uid, h, b.items) }
+  @Post('bulk-delete') @Roles('admin', 'super_admin') @ApiBearerAuth() bulkDelete(@CurrentUser('tenantId') u: string, @Headers('x-tenant-id') h: string, @Body() b: any) { return this.doBulkRemove(u, h, b.ids) }
   @Post() @Roles('admin', 'manager', 'super_admin') @ApiBearerAuth() create(@CurrentUser('tenantId') u: string, @CurrentUser('id') uid: string, @Headers('x-tenant-id') h: string, @Body() d: any) { return this.doCreate(u, uid, h, d) }
   @Put(':id') @Roles('admin', 'manager', 'super_admin') @ApiBearerAuth() update(@CurrentUser('tenantId') u: string, @Headers('x-tenant-id') h: string, @Param('id') id: string, @Body() d: any) { return this.doUpdate(u, h, id, d) }
   @Delete(':id') @Roles('admin', 'super_admin') @ApiBearerAuth() remove(@CurrentUser('tenantId') u: string, @Headers('x-tenant-id') h: string, @Param('id') id: string) { return this.doRemove(u, h, id) }
@@ -142,6 +153,7 @@ export class DiamondMetalWeightController extends RateCrud<DiamondMetalWeightSer
   @Get() @Public() list(@Headers('x-tenant-id') h: string, @Query('active') a?: string) { return this.doList(h, a) }
   @Get(':id') @Public() get(@Headers('x-tenant-id') h: string, @Param('id') id: string) { return this.doGet(h, id) }
   @Post('bulk') @Roles('admin', 'manager', 'super_admin') @ApiBearerAuth() bulk(@CurrentUser('tenantId') u: string, @CurrentUser('id') uid: string, @Headers('x-tenant-id') h: string, @Body() b: any) { return this.doBulk(u, uid, h, b.items) }
+  @Post('bulk-delete') @Roles('admin', 'super_admin') @ApiBearerAuth() bulkDelete(@CurrentUser('tenantId') u: string, @Headers('x-tenant-id') h: string, @Body() b: any) { return this.doBulkRemove(u, h, b.ids) }
   @Post() @Roles('admin', 'manager', 'super_admin') @ApiBearerAuth() create(@CurrentUser('tenantId') u: string, @CurrentUser('id') uid: string, @Headers('x-tenant-id') h: string, @Body() d: any) { return this.doCreate(u, uid, h, d) }
   @Put(':id') @Roles('admin', 'manager', 'super_admin') @ApiBearerAuth() update(@CurrentUser('tenantId') u: string, @Headers('x-tenant-id') h: string, @Param('id') id: string, @Body() d: any) { return this.doUpdate(u, h, id, d) }
   @Delete(':id') @Roles('admin', 'super_admin') @ApiBearerAuth() remove(@CurrentUser('tenantId') u: string, @Headers('x-tenant-id') h: string, @Param('id') id: string) { return this.doRemove(u, h, id) }

@@ -19,6 +19,7 @@ import {
   ApiOperation,
   ApiQuery,
 } from '@nestjs/swagger'
+import { SkipThrottle } from '@nestjs/throttler'
 import { ProductsService } from './products.service'
 import { CreateProductDto } from './dto/create-product.dto'
 import { UpdateProductDto } from './dto/update-product.dto'
@@ -45,6 +46,17 @@ export class ProductsController {
     @Query() dto: ProductFilterDto,
   ) {
     return this.productsService.findAll(tenantId, dto)
+  }
+
+  @Post('link-counts')
+  @Public()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Count live products behind storefront listing links (menu validation)' })
+  linkCounts(
+    @Headers('x-tenant-id') tenantId: string,
+    @Body() body: { links?: string[] },
+  ) {
+    return this.productsService.countListingLinks(tenantId, (body?.links || []).slice(0, 300))
   }
 
   @Get('search')
@@ -108,6 +120,7 @@ export class ProductsController {
 
   @Post()
   @Roles('staff', 'manager', 'admin', 'super_admin')
+  @SkipThrottle()
   @ApiOperation({ summary: 'Create a new product' })
   create(
     @Headers('x-tenant-id') tenantId: string,
@@ -115,6 +128,18 @@ export class ProductsController {
     @CurrentUser('id') userId: string,
   ) {
     return this.productsService.create(tenantId, dto, userId)
+  }
+
+  @Post('upsert')
+  @Roles('staff', 'manager', 'admin', 'super_admin')
+  @SkipThrottle()
+  @ApiOperation({ summary: 'Create a product, or update+restore it if productCode already exists (incl. soft-deleted) — used by CSV import' })
+  upsert(
+    @Headers('x-tenant-id') tenantId: string,
+    @Body() dto: CreateProductDto,
+    @CurrentUser('id') userId: string,
+  ) {
+    return this.productsService.upsertByCode(tenantId, dto, userId)
   }
 
   @Patch(':id')
@@ -131,6 +156,7 @@ export class ProductsController {
 
   @Delete(':id')
   @Roles('admin', 'super_admin')
+  @SkipThrottle()
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Soft-delete a product' })
   softDelete(
@@ -144,6 +170,7 @@ export class ProductsController {
 
   @Post('media')
   @Roles('staff', 'manager', 'admin', 'super_admin')
+  @SkipThrottle()
   @ApiOperation({ summary: 'Create a product media record' })
   createMedia(@Body() body: Record<string, any>) {
     return this.productsService.createMedia(body)
@@ -151,6 +178,7 @@ export class ProductsController {
 
   @Post('media/bulk')
   @Roles('staff', 'manager', 'admin', 'super_admin')
+  @SkipThrottle()
   @ApiOperation({ summary: 'Bulk-create product media records' })
   bulkCreateMedia(@Body() body: { items: Record<string, any>[] }) {
     return this.productsService.bulkCreateMedia(body.items ?? [])

@@ -93,6 +93,17 @@ export class SeoController {
     return this.svc.generateFacetPages(tn(u, h), body?.base)
   }
 
+  @Post('reconcile-facets')
+  @Roles('admin', 'manager', 'super_admin')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Unpublish facet pages without inventory; add unique intros to the rest (admin)' })
+  reconcileFacets(
+    @CurrentUser('tenantId') u: string,
+    @Headers('x-tenant-id') h: string,
+  ) {
+    return this.svc.reconcileFacetPages(tn(u, h))
+  }
+
   @Get('schema/product/:productId')
   @Public()
   @ApiOperation({ summary: 'schema.org Product+Offer JSON-LD for a product (public)' })

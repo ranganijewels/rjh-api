@@ -64,6 +64,12 @@ export interface PriceAttributes {
   mrpOverride?: number
 }
 
+// Diamond colour/clarity is chosen by the shopper only for stones above this
+// size (per piece); smaller stones keep the BOM's colour/clarity.
+export const SELECTABLE_MIN_CT = 0.29
+export const perPieceCt = (d: { carat?: number; pcs?: number }) =>
+  (Number(d.carat) || 0) / Math.max(1, Number(d.pcs) || 1)
+
 @Injectable()
 export class PricingEngineService {
   // Tiny in-process cache for resolved breakdowns (rate masters change rarely).
@@ -116,6 +122,22 @@ export class PricingEngineService {
       }))
       .filter((d: any) => d.carat > 0)
 
+    // A shopper-selected colour/clarity (PDP, cart, checkout) applies only to
+    // stones large enough to be selectable (> SELECTABLE_MIN_CT per piece);
+    // small melee keeps the colour/clarity entered in the BOM.
+    if ((opts.diamondColor || opts.diamondClarity) && diamondLines.length) {
+      const selectedCentre = Number(opts.centerCaratCt) || 0
+      for (const d of diamondLines) {
+        const perPiece = d.isCenter && selectedCentre ? selectedCentre / Math.max(1, d.pcs) : perPieceCt(d)
+        if (perPiece <= SELECTABLE_MIN_CT) continue
+        if (opts.diamondColor) d.color = opts.diamondColor
+        if (opts.diamondClarity) {
+          d.clarity = opts.diamondClarity
+          d.qualityGrade = opts.diamondClarity
+        }
+      }
+    }
+
     // The metal weight (Materials row + the carat→weight matrix) is entered at
     // ONE purity: the one stated on the Materials METAL row (e.g. "14K"). That
     // is the anchor for the ±15% purity-weight rule — NOT product.metalPurity,
@@ -157,6 +179,42 @@ export class PricingEngineService {
     const result = { productId, sku: p.productCode, productName: p.productName, ...data }
     this.cache.set(cacheKey, { at: Date.now(), data: result })
     return result
+  }
+
+  // Diamond colour/clarity choices for a product's centre stone (or its main
+  // diamond line when there is no centre stone), at the selected carat.
+  async diamondOptions(tenantId: string, productId: string, carat?: number) {
+    const p = await this.productRepo.findOne({ where: { id: productId, tenantId } as any })
+    if (!p) throw new NotFoundException(`Product ${productId} not found`)
+    const materials = Array.isArray((p.metadata as any)?.materials) ? (p.metadata as any).materials : []
+    const diamonds = materials
+      .filter((m: any) => String(m?.materialType || '').toLowerCase() === 'diamond')
+      .map((m: any) => {
+        const pcs = Math.max(1, Number(m.pcs) || 1)
+        const total = m.centerStone && Number(carat) ? Number(carat) * pcs : Number(m.wt) || 0
+        return { ...m, pieceCt: total / pcs }
+      })
+    // Only stones over SELECTABLE_MIN_CT per piece are selectable; offer the
+    // choice for the centre stone, else the largest selectable stone.
+    const selectable = diamonds.filter((d: any) => d.pieceCt > SELECTABLE_MIN_CT)
+    const line =
+      selectable.find((m: any) => m.centerStone) ||
+      selectable.sort((a: any, b: any) => b.pieceCt - a.pieceCt)[0]
+    const noBom = !diamonds.length
+    const fallbackCt = Number(carat) || Number(p.centerStoneWeightCt) || 0
+    if (!line && !(noBom && fallbackCt > SELECTABLE_MIN_CT)) {
+      return { colors: [], clarities: [], shape: null, carat: 0, defaultColor: null, defaultClarity: null }
+    }
+    const shape = line?.shape || p.centerStoneShape || p.diamondShape
+    const ct = line ? line.pieceCt : fallbackCt
+    const opts = await this.diamond.optionsFor(tenantId, shape, ct)
+    return {
+      ...opts,
+      shape: shape || null,
+      carat: ct,
+      defaultColor: line?.color || p.diamondColor || null,
+      defaultClarity: line?.quality || p.diamondClarity || null,
+    }
   }
 
   /**
@@ -229,9 +287,14 @@ export class PricingEngineService {
           ? centerCarat || Number(ln.carat) || 0
           : Number(ln.carat) || 0
         if (lineCt <= 0) continue
+        // The BOM weight is the TOTAL for the line (e.g. 16 pcs = 0.48 ct);
+        // rate slabs are per stone, so look up by the per-piece weight
+        // (0.48 / 16 = 0.03 ct) and value the line at total ct × that rate.
+        const pcs = Math.max(1, Number(ln.pcs) || 1)
+        const pieceCt = lineCt / pcs
         const { rate, perCarat: lpc } = await this.diamond.resolvePerCarat(
           tenantId,
-          { shape: ln.shape, carat: lineCt, color: ln.color, clarity: ln.clarity, qualityGrade: ln.qualityGrade },
+          { shape: ln.shape, carat: pieceCt, color: ln.color, clarity: ln.clarity, qualityGrade: ln.qualityGrade },
           asOf,
         )
         diamondValue += lineCt * lpc
@@ -243,6 +306,8 @@ export class PricingEngineService {
         diamondLinesOut.push({
           shape: ln.shape || null,
           isCenter: !!ln.isCenter,
+          pcs,
+          perPieceCt: Math.round(pieceCt * 10000) / 10000,
           caratWeight: round(lineCt),
           ratePerCarat: round(lpc),
           value: round(lineCt * lpc),

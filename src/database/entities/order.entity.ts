@@ -112,8 +112,45 @@ export class Order {
   @Column({ name: 'payment_status', default: 'Pending' })
   paymentStatus: string
 
+  @Column({ name: 'payment_method', default: 'COD' })
+  paymentMethod: string
+
+  @Column({ name: 'payment_gateway', nullable: true })
+  paymentGateway: string
+
+  // Short-lived token the storefront uses to launch the Cashfree checkout
+  // widget — not a secret, safe to return to the client.
+  @Column({ name: 'cf_payment_session_id', type: 'text', nullable: true })
+  cfPaymentSessionId: string
+
+  // Cashfree's own payment reference once a payment attempt settles —
+  // populated by the webhook, used for reconciliation.
+  @Column({ name: 'cf_payment_id', nullable: true })
+  cfPaymentId: string
+
+  // totalAmount above is always USD (the store's base currency — see
+  // storefront/src/utils/money.js). For online payments, the shopper may be
+  // charged in a different currency at their selected exchange rate — these
+  // two columns record what was ACTUALLY charged, for accurate reconciliation
+  // and refunds. COD orders leave these at the USD default (no conversion).
+  @Column({ name: 'currency_code', default: 'USD' })
+  currencyCode: string
+
+  @Column({ name: 'charged_amount', type: 'numeric', precision: 14, scale: 2, nullable: true })
+  chargedAmount: number
+
   @Column({ name: 'order_notes', type: 'text', nullable: true })
   orderNotes: string
+
+  // Full cart lines with their configuration (metal, stone, size, engraving,
+  // earring back…). The flat product columns above only describe line 1.
+  @Column({ name: 'line_items', type: 'jsonb', nullable: true })
+  lineItems: Array<Record<string, any>> | null
+
+  // Staff/QA orders — kept for the audit trail, excluded from revenue,
+  // conversion and dashboard reporting.
+  @Column({ name: 'is_test', type: 'boolean', default: false })
+  isTest: boolean
 
   @Column({ name: 'job_card_id', type: 'uuid', nullable: true })
   jobCardId: string
@@ -160,4 +197,8 @@ export class Order {
 
   @Column({ name: 'is_deleted', default: false })
   isDeleted: boolean
+
+  // Campaign attribution (UTMs, referrer, click ids) + consented Meta match keys.
+  @Column({ type: 'jsonb', nullable: true })
+  marketing: Record<string, any> | null
 }

@@ -40,4 +40,8 @@ export class ContactSubmission {
 
   @UpdateDateColumn({ type: 'timestamptz' })
   updatedAt: Date
+
+  // Campaign attribution (UTMs, referrer, click ids) + consented Meta match keys.
+  @Column({ type: 'jsonb', nullable: true })
+  marketing: Record<string, any> | null
 }

@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
-import { Repository } from 'typeorm'
+import { Repository, In } from 'typeorm'
 import { PriceBook } from '../../../database/entities/price-book.entity'
 
 @Injectable()
@@ -42,6 +42,12 @@ export class PriceBookService {
     const row = await this.get(tenantId, id)
     await this.repo.remove(row)
     return { success: true }
+  }
+
+  async bulkRemove(tenantId: string, ids: string[]): Promise<{ deleted: number }> {
+    if (!ids?.length) return { deleted: 0 }
+    const result = await this.repo.delete({ tenantId, id: In(ids) } as any)
+    return { deleted: result.affected ?? 0 }
   }
 
   /** Resolve the best price book by id, else by customer type (+ country), else null. */

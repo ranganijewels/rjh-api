@@ -7,6 +7,9 @@ import {
 import { v4 as uuid } from 'uuid'
 import * as path from 'path'
 import * as sharp from 'sharp'
+import { execFile } from 'child_process'
+import { promises as fsp } from 'fs'
+import * as os from 'os'
 import { MinioService } from '../../infrastructure/minio/minio.service'
 
 const ALLOWED_MIMETYPES = [
@@ -96,7 +99,42 @@ export class MediaService {
     const url = await this.minioService.upload(bucket, key, buffer, file.mimetype)
 
     this.logger.log(`Uploaded file to ${bucket}/${key}`)
+    if (file.mimetype.startsWith('video/')) {
+      // Background, best effort: a "-poster.jpg" still beside the video (the
+      // storefront hero shows it first) and a lighter re-encode of big files.
+      this.optimizeVideo(bucket, key, buffer, file.mimetype).catch((err) =>
+        this.logger.warn(`video optimisation skipped for ${key}: ${err?.message || err}`),
+      )
+    }
     return { url, key, bucket }
+  }
+
+  private run(cmd: string, args: string[]) {
+    return new Promise<void>((resolve, reject) =>
+      execFile(cmd, args, { timeout: 10 * 60 * 1000 }, (err) => (err ? reject(err) : resolve())),
+    )
+  }
+
+  private async optimizeVideo(bucket: string, key: string, buffer: Buffer, mimetype: string) {
+    const dir = await fsp.mkdtemp(path.join(os.tmpdir(), 'rj-video-'))
+    const ext = path.extname(key) || '.mp4'
+    const src = path.join(dir, `src${ext}`)
+    try {
+      await fsp.writeFile(src, buffer)
+      const poster = path.join(dir, 'poster.jpg')
+      await this.run('ffmpeg', ['-nostdin', '-v', 'error', '-y', '-ss', '0.5', '-i', src, '-vframes', '1', '-vf', 'scale=w=min(1280\\,iw):h=-2', '-q:v', '5', poster])
+      const posterKey = key.replace(/\.[^.]+$/, '-poster.jpg')
+      await this.minioService.upload(bucket, posterKey, await fsp.readFile(poster), 'image/jpeg')
+
+      if (buffer.length > 3 * 1024 * 1024 && /mp4/.test(mimetype)) {
+        const out = path.join(dir, 'out.mp4')
+        await this.run('ffmpeg', ['-nostdin', '-v', 'error', '-y', '-i', src, '-c:v', 'libx264', '-preset', 'medium', '-crf', '28', '-pix_fmt', 'yuv420p', '-vf', 'scale=w=min(1280\\,iw):h=-2', '-c:a', 'aac', '-b:a', '96k', '-movflags', '+faststart', '-f', 'mp4', out])
+        const smaller = await fsp.readFile(out)
+        if (smaller.length < buffer.length) await this.minioService.upload(bucket, key, smaller, mimetype)
+      }
+    } finally {
+      await fsp.rm(dir, { recursive: true, force: true })
+    }
   }
 
   async deleteFile(bucket: string, key: string): Promise<void> {

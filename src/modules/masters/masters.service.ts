@@ -88,24 +88,67 @@ export class MastersService {
     return qb.orderBy('val.sortOrder', 'ASC').getMany()
   }
 
+  // Several admin screens (blog/FAQ categories, departments, product category)
+  // POST here with a loose `{ category: '<key>', value, label }` shape instead
+  // of the entity's real `categoryId` (uuid FK) / `valueKey` / `valueLabel`
+  // columns — those extra properties were silently dropped by TypeORM, so
+  // every value they "created" saved with categoryId null and no key/label
+  // (or failed the categoryId NOT NULL constraint outright). Resolving the
+  // aliases here fixes every one of those screens at the source instead of
+  // patching each admin route individually.
+  private async resolveCategoryId(
+    tenantId: string,
+    dto: Record<string, any>,
+  ): Promise<string | undefined> {
+    if (dto.categoryId) return dto.categoryId
+    const key = dto.categoryKey || dto.category
+    if (!key) return undefined
+    const category = await this.categoryRepo.findOne({ where: { tenantId, categoryKey: key } })
+    if (!category) throw new NotFoundException(`Master category '${key}' not found`)
+    return category.id
+  }
+
   async createValue(
     tenantId: string,
-    dto: Partial<MasterValue>,
+    dto: Record<string, any>,
     userId: string,
   ): Promise<MasterValue> {
-    const value = this.valueRepo.create({ ...dto, tenantId })
+    const categoryId = await this.resolveCategoryId(tenantId, dto)
+    const value = this.valueRepo.create({
+      tenantId,
+      categoryId,
+      valueKey: dto.valueKey ?? dto.value ?? dto.label,
+      valueLabel: dto.valueLabel ?? dto.label ?? dto.value,
+      description: dto.description,
+      metadata: dto.metadata,
+      isActive: dto.isActive,
+      sortOrder: dto.sortOrder,
+    })
     return this.valueRepo.save(value)
   }
 
   async updateValue(
     tenantId: string,
     id: string,
-    dto: Partial<MasterValue>,
+    dto: Record<string, any>,
     userId: string,
   ): Promise<MasterValue> {
     const value = await this.valueRepo.findOne({ where: { id, tenantId } })
     if (!value) throw new NotFoundException('Master value not found')
-    Object.assign(value, dto)
+
+    // Only known columns — never spread raw `dto` onto the entity, since a
+    // stray `category`/`value`/`label` alias would otherwise land on the
+    // `category` relation / non-existent properties instead of the real
+    // categoryId/valueKey/valueLabel columns.
+    const categoryId = await this.resolveCategoryId(tenantId, dto)
+    if (categoryId) value.categoryId = categoryId
+    if (dto.valueKey ?? dto.value) value.valueKey = dto.valueKey ?? dto.value
+    if (dto.valueLabel ?? dto.label) value.valueLabel = dto.valueLabel ?? dto.label
+    if (dto.description !== undefined) value.description = dto.description
+    if (dto.metadata !== undefined) value.metadata = dto.metadata
+    if (dto.isActive !== undefined) value.isActive = dto.isActive
+    if (dto.sortOrder !== undefined) value.sortOrder = dto.sortOrder
+
     return this.valueRepo.save(value)
   }
 

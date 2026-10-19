@@ -13,7 +13,20 @@ import { ResponseTransformInterceptor } from './common/interceptors/response-tra
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
     logger: ['error', 'warn', 'log', 'debug'],
+    // Exposes req.rawBody (exact bytes) alongside the normal parsed body —
+    // needed to verify the Cashfree webhook's HMAC signature, which is
+    // computed over the raw request bytes, not the re-serialized JSON.
+    rawBody: true,
   })
+
+  // Express's default JSON body limit is 100kb — comfortably enough for one
+  // record, but a bulk import (pricing-master CSV import, catalog bulk ops)
+  // or a base64-encoded image posted as JSON can exceed that easily, which
+  // surfaced as a bare "request entity too large" 500 with no useful detail.
+  // useBodyParser (not a manual express.json() app.use()) keeps this
+  // rawBody-aware, so the Cashfree webhook signature check above still works.
+  app.useBodyParser('json', { limit: '10mb' })
+  app.useBodyParser('urlencoded', { limit: '10mb', extended: true })
 
   const configService = app.get(ConfigService)
   const port = configService.get<number>('PORT', 4000)
@@ -70,7 +83,11 @@ async function bootstrap() {
   const document = SwaggerModule.createDocument(app, swaggerConfig)
   SwaggerModule.setup('api/docs', app, document)
 
-  await app.listen(port)
+  // Graceful shutdown: on pm2 reload the old worker finishes in-flight requests
+  // before exiting, so deploys drop nothing.
+  app.enableShutdownHooks()
+  if (process.env.HOST) await app.listen(port, process.env.HOST)
+  else await app.listen(port)
   console.log(`🚀 RJ House API running on http://localhost:${port}/api/v1`)
   console.log(`📚 Swagger docs at http://localhost:${port}/api/docs`)
 }

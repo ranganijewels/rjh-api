@@ -41,8 +41,9 @@ export class AnalyticsService {
     const startOf12mo = new Date(now.getFullYear(), now.getMonth() - 11, 1)
 
     // Pull all non-deleted orders once; aggregate in memory (volume is modest).
+    // Test orders (staff/QA) stay in the order list but never in reporting.
     const orders = await this.orderRepo.find({
-      where: { tenantId, isDeleted: false },
+      where: { tenantId, isDeleted: false, isTest: false },
       order: { createdAt: 'DESC' },
     })
 

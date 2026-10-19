@@ -5,6 +5,7 @@ import {
   Inject,
 } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
+import { MarketingService } from '../marketing/marketing.service'
 import { Repository } from 'typeorm'
 import { CACHE_MANAGER } from '@nestjs/cache-manager'
 import { Cache } from 'cache-manager'
@@ -12,16 +13,63 @@ import { Customer, CustomerType } from '../../database/entities/customer.entity'
 import { CustomerAddress } from '../../database/entities/customer-address.entity'
 import { Order } from '../../database/entities/order.entity'
 import { User } from '../../database/entities/user.entity'
+import { Product } from '../../database/entities/product.entity'
 import { CouponsService } from '../coupons/coupons.service'
 import { PricingEngineService } from '../pricing/services/pricing-engine.service'
 import { EmailService } from '../../infrastructure/email/email.service'
+import { CashfreeService } from '../payments/services/cashfree.service'
+import { CurrencyService } from '../currency/currency.service'
+import { ConfigService } from '@nestjs/config'
+import { createHash } from 'crypto'
 
 interface CartItem {
+  // One line per product CONFIGURATION (metal, stone, size, engraving…), so
+  // the same design in two configurations stays as two lines.
+  lineId?: string
   productId: string
   productName: string
   quantity: number
   price: number
   metadata?: Record<string, any>
+}
+
+const CONFIG_KEYS = [
+  'metalType', 'metalColor', 'shape', 'centerDiamondWeight', 'ringSize', 'size',
+  'clarity', 'color', 'engraving', 'backType',
+]
+
+export function cartLineId(productId: string, metadata: Record<string, any> = {}): string {
+  const config = CONFIG_KEYS.map((k) => `${k}=${String(metadata?.[k] ?? '').trim().toLowerCase()}`).join('|')
+  return createHash('sha1').update(`${productId}|${config}`).digest('hex').slice(0, 16)
+}
+
+// Orders placed by staff/QA must not count as revenue. Flag them at creation
+// from the internal email domains or an explicit test marker; staff can also
+// toggle the flag in admin. Comma-separated TEST_ORDER_EMAIL_DOMAINS extends it.
+export function isTestOrder(email: string | null | undefined, dto: { notes?: string } = {}): boolean {
+  const domains = ['rjhouse.com', 'therjhouse.com', 'example.com', 'test.com', 'mailinator.com']
+    .concat(String(process.env.TEST_ORDER_EMAIL_DOMAINS || '').split(',').map((d) => d.trim().toLowerCase()))
+    .filter(Boolean)
+  const e = String(email || '').toLowerCase().trim()
+  const domain = e.split('@')[1] || ''
+  if (domains.includes(domain)) return true
+  if (/(^|[^a-z])test([^a-z]|$)/i.test(e.split('@')[0] || '')) return true
+  return /\[test\]/i.test(dto.notes || '')
+}
+
+// Pricing-engine overrides for a configured cart line — the same mapping the
+// storefront uses for the PDP and cart display, so the charged price matches.
+export function cartLineOverrides(meta: Record<string, any> = {}): Record<string, any> {
+  const overrides: Record<string, any> = {}
+  if (meta.metalType) overrides.metalPurity = String(meta.metalType).replace('KT', 'K')
+  if (meta.metalColor) overrides.metalColor = meta.metalColor
+  const ct = Number(String(meta.centerDiamondWeight ?? '').replace(/[^0-9.]/g, ''))
+  // Same key the PDP price uses: the chosen carat is the CENTRE stone weight.
+  if (ct > 0) overrides.centerCaratCt = ct
+  if (meta.metalTypeName) overrides.metalType = meta.metalTypeName
+  if (meta.clarity) overrides.diamondClarity = meta.clarity
+  if (meta.color) overrides.diamondColor = meta.color
+  return overrides
 }
 
 interface Cart {
@@ -39,13 +87,28 @@ export interface CheckoutDto {
   shippingAddressId?: string
   shippingAddress?: Record<string, any>
   paymentMethod?: string
+  // ISO currency code the shopper was viewing prices in (e.g. "INR", "USD").
+  // totalAmount is always computed in the store's USD base; for online
+  // payments this is converted at the live rate before charging, so the
+  // amount charged matches the amount the shopper was actually shown.
+  currencyCode?: string
   notes?: string
+  // Guest checkout only — collected instead of requiring login. An account
+  // is created silently (no password) so the order has a real customer
+  // record; a returning guest is matched back to it by email.
+  guestEmail?: string
+  guestName?: string
+  guestPhone?: string
+  // Attribution + consented match keys captured by the storefront.
+  marketing?: Record<string, any>
 }
 
 @Injectable()
 export class StorefrontService {
-  private readonly CART_TTL = 60 * 60 * 24 * 7 // 7 days
-  private readonly WISHLIST_TTL = 60 * 60 * 24 * 30 // 30 days
+  // cache-manager v5 takes the TTL in MILLISECONDS (it was passed as seconds, so carts
+  // silently expired after ~10 minutes and wishlists after ~43).
+  private readonly CART_TTL = 60 * 60 * 24 * 7 * 1000 // 7 days
+  private readonly WISHLIST_TTL = 60 * 60 * 24 * 30 * 1000 // 30 days
 
   constructor(
     @InjectRepository(Customer)
@@ -60,6 +123,9 @@ export class StorefrontService {
     @InjectRepository(User)
     private readonly userRepo: Repository<User>,
 
+    @InjectRepository(Product)
+    private readonly productRepo: Repository<Product>,
+
     @Inject(CACHE_MANAGER)
     private readonly cacheManager: Cache,
 
@@ -68,6 +134,14 @@ export class StorefrontService {
     private readonly pricingEngine: PricingEngineService,
 
     private readonly emailService: EmailService,
+
+    private readonly cashfreeService: CashfreeService,
+
+    private readonly currencyService: CurrencyService,
+
+    private readonly configService: ConfigService,
+
+    private readonly marketingService: MarketingService,
   ) {}
 
   // ─── Cart Helpers ─────────────────────────────────────────────────────────
@@ -98,37 +172,68 @@ export class StorefrontService {
   // ─── Cart ─────────────────────────────────────────────────────────────────
 
   async getCart(customerId: string): Promise<Cart> {
-    return this.readCart(customerId)
+    return this.withLineIds(await this.readCart(customerId))
+  }
+
+  // Lines saved before lineIds existed are keyed by productId.
+  private withLineIds(cart: Cart): Cart {
+    for (const i of cart.items) if (!i.lineId) i.lineId = cartLineId(i.productId, i.metadata)
+    return cart
+  }
+
+  private matchesLine(i: CartItem, key: string) {
+    return i.lineId === key || (!i.lineId && i.productId === key)
   }
 
   async addToCart(customerId: string, item: CartItem): Promise<Cart> {
-    const cart = await this.readCart(customerId)
-    const existing = cart.items.find((i) => i.productId === item.productId)
+    const cart = this.withLineIds(await this.readCart(customerId))
+    const quantity = Math.max(1, Math.floor(Number(item.quantity) || 1))
+    const lineId = cartLineId(item.productId, item.metadata)
+    const existing = cart.items.find((i) => i.lineId === lineId)
     if (existing) {
-      existing.quantity += item.quantity
+      existing.quantity += quantity
     } else {
-      cart.items.push(item)
+      cart.items.push({ ...item, quantity, lineId })
     }
     await this.saveCart(customerId, cart)
     return cart
   }
 
-  async updateCartItem(customerId: string, productId: string, quantity: number): Promise<Cart> {
-    const cart = await this.readCart(customerId)
+  async updateCartItem(customerId: string, key: string, quantity: number): Promise<Cart> {
+    const cart = this.withLineIds(await this.readCart(customerId))
     if (quantity <= 0) {
-      cart.items = cart.items.filter((i) => i.productId !== productId)
+      cart.items = cart.items.filter((i) => !this.matchesLine(i, key))
     } else {
-      const item = cart.items.find((i) => i.productId === productId)
-      if (item) item.quantity = quantity
+      const item = cart.items.find((i) => this.matchesLine(i, key))
+      if (item) item.quantity = Math.floor(quantity)
     }
     await this.saveCart(customerId, cart)
     return cart
   }
 
-  async removeFromCart(customerId: string, productId: string): Promise<Cart> {
-    const cart = await this.readCart(customerId)
-    cart.items = cart.items.filter((i) => i.productId !== productId)
+  async removeFromCart(customerId: string, key: string): Promise<Cart> {
+    const cart = this.withLineIds(await this.readCart(customerId))
+    cart.items = cart.items.filter((i) => !this.matchesLine(i, key))
     await this.saveCart(customerId, cart)
+    return cart
+  }
+
+  // A shopper who built a bag as a guest and then signs in keeps it: guest
+  // lines are folded into the account's cart (same configuration → quantities
+  // add up) and the guest cart is cleared.
+  async mergeGuestCart(customerId: string, guestId: string): Promise<Cart> {
+    if (!guestId || guestId === customerId) return this.withLineIds(await this.readCart(customerId))
+    const guest = this.withLineIds(await this.readCart(guestId))
+    const cart = this.withLineIds(await this.readCart(customerId))
+    if (!guest.items.length) return cart
+    for (const g of guest.items) {
+      const existing = cart.items.find((i) => i.lineId === g.lineId)
+      if (existing) existing.quantity += g.quantity
+      else cart.items.push(g)
+    }
+    if (!cart.coupon && guest.coupon) cart.coupon = guest.coupon
+    await this.saveCart(customerId, cart)
+    await this.clearCart(guestId)
     return cart
   }
 
@@ -168,14 +273,6 @@ export class StorefrontService {
   }
 
   /** Absolute discount for a cart given its coupon + subtotal. */
-  private couponDiscount(cart: Cart, subtotal: number): number {
-    if (!cart.coupon) return 0
-    if (cart.coupon.discountType === 'fixed') {
-      return Math.min(cart.coupon.discount, subtotal)
-    }
-    return Math.round(subtotal * (cart.coupon.discount / 100) * 100) / 100
-  }
-
   async clearCart(customerId: string): Promise<void> {
     await this.cacheManager.del(this.cartKey(customerId))
   }
@@ -223,34 +320,76 @@ export class StorefrontService {
 
   // ─── Checkout ─────────────────────────────────────────────────────────────
 
-  async checkout(tenantId: string, customerId: string, dto: CheckoutDto): Promise<Order> {
-    const cart = await this.readCart(customerId)
+  async checkout(
+    tenantId: string,
+    customerId: string,
+    dto: CheckoutDto,
+    isGuest = false,
+  ): Promise<Order> {
+    // The cart lives under whatever identity the shopper checked out with —
+    // their guest session id if they were never logged in. Read/clear it
+    // with that key; the ORDER, however, must belong to a real Customer row.
+    const cartKeyId = customerId
+    const cart = await this.readCart(cartKeyId)
     if (!cart.items.length) {
       throw new BadRequestException('Cart is empty')
     }
 
-    let customer = await this.customerRepo.findOne({
-      where: { id: customerId, isDeleted: false },
-    })
+    let customer: Customer | null = null
 
-    // Auto-create jeos_customers record for website users on first checkout
-    if (!customer) {
-      const user = await this.userRepo.findOne({ where: { id: customerId, isActive: true } })
-      if (!user) throw new NotFoundException('Customer not found')
+    if (isGuest) {
+      const email = (dto.guestEmail || '').trim().toLowerCase()
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        throw new BadRequestException('A valid email is required to check out as a guest')
+      }
+      const a = dto.shippingAddress || {}
+      if (!a.name || !a.street || !a.city || !a.country) {
+        throw new BadRequestException('A shipping address (name, street, city and country) is required')
+      }
+      customer = await this.customerRepo.findOne({
+        where: { tenantId, email, isDeleted: false },
+      })
+      if (!customer) {
+        customer = await this.customerRepo.save(
+          this.customerRepo.create({
+            tenantId,
+            customerName: dto.guestName || email,
+            email,
+            phone: dto.guestPhone || '',
+            customerCode: `GUEST-${Date.now().toString(36).toUpperCase()}`,
+            customerType: CustomerType.RETAIL,
+            isActive: true,
+          }),
+        )
+      }
+    } else {
+      customer = await this.customerRepo.findOne({
+        where: { id: customerId, isDeleted: false },
+      })
 
-      customer = await this.customerRepo.save(
-        this.customerRepo.create({
-          id: customerId,
-          tenantId,
-          customerName: user.fullName || user.email,
-          email: user.email,
-          phone: user.phone || '',
-          customerCode: `WEB-${customerId.slice(0, 8).toUpperCase()}`,
-          customerType: CustomerType.RETAIL,
-          isActive: true,
-        }),
-      )
+      // Auto-create jeos_customers record for website users on first checkout
+      if (!customer) {
+        const user = await this.userRepo.findOne({ where: { id: customerId, isActive: true } })
+        if (!user) throw new NotFoundException('Customer not found')
+
+        customer = await this.customerRepo.save(
+          this.customerRepo.create({
+            id: customerId,
+            tenantId,
+            customerName: user.fullName || user.email,
+            email: user.email,
+            phone: user.phone || '',
+            customerCode: `WEB-${customerId.slice(0, 8).toUpperCase()}`,
+            customerType: CustomerType.RETAIL,
+            isActive: true,
+          }),
+        )
+      }
     }
+
+    // From here on, orders/Cashfree/emails always use the real customer's id
+    // — never the guest session id, which only ever identified the cart.
+    const realCustomerId = customer.id
 
     // Re-price every line item from the Pricing Engine server-side so the order
     // total is authoritative and tamper-proof (never trust the client price).
@@ -258,12 +397,7 @@ export class StorefrontService {
     // color, carat) — pricing the product's defaults would charge the wrong amount.
     for (const item of cart.items) {
       try {
-        const meta = item.metadata || {}
-        const overrides: Record<string, any> = {}
-        if (meta.metalType) overrides.metalPurity = String(meta.metalType).replace('KT', 'K')
-        if (meta.metalColor) overrides.metalColor = meta.metalColor
-        const ct = Number(String(meta.centerDiamondWeight ?? '').replace(/[^0-9.]/g, ''))
-        if (ct > 0) overrides.diamondWeightCt = ct
+        const overrides = cartLineOverrides(item.metadata || {})
         const priced = await this.pricingEngine.calculateForProduct(tenantId, item.productId, overrides)
         if (priced?.finalPrice > 0) item.price = priced.finalPrice
       } catch {
@@ -278,7 +412,19 @@ export class StorefrontService {
       const qty = Number(i.quantity) || 0
       return sum + price * qty
     }, 0)
-    const discountAmount = Number(this.couponDiscount(cart, subtotal)) || 0
+    // Re-check the coupon against the authoritative (re-priced) subtotal —
+    // dates, usage limit, minimum order and max discount all apply here.
+    let discountAmount = 0
+    if (cart.coupon?.code) {
+      try {
+        const { discount } = await this.couponsService.validate(tenantId, cart.coupon.code, subtotal)
+        discountAmount = Number(discount) || 0
+      } catch (e: any) {
+        throw new BadRequestException(
+          `Coupon ${cart.coupon.code} can't be used: ${e?.message || 'not valid'}. Remove it from your bag to continue.`,
+        )
+      }
+    }
     const totalAmount = Math.max(0, subtotal - discountAmount)
     if (!Number.isFinite(totalAmount)) {
       throw new BadRequestException('Could not compute a valid order total')
@@ -297,10 +443,89 @@ export class StorefrontService {
           .join(', ')
       : ''
 
+    // Online payment: create the Cashfree session BEFORE touching the DB or
+    // cart, so a Cashfree failure aborts cleanly — the customer keeps their
+    // cart and can just retry, instead of being left with an orphaned order
+    // they can never pay for.
+    const isOnline = (dto.paymentMethod || 'COD').toUpperCase() === 'ONLINE'
+    let cfSession: { cfOrderId: string; paymentSessionId: string } | null = null
+    // totalAmount is always USD (the store's base currency). Convert to
+    // whatever currency the shopper was actually shown before charging them —
+    // this is the fix for the bug where the checkout total displayed e.g.
+    // "₹423" (just a re-labeled USD figure, not a real conversion) and then
+    // Cashfree was always billed in INR regardless of the shown currency.
+    let chargeCurrency = 'USD'
+    let chargeAmount = totalAmount
+    if (isOnline) {
+      const requestedCode = (dto.currencyCode || 'USD').toUpperCase()
+      const currencyRow =
+        requestedCode === 'USD'
+          ? null
+          : (await this.currencyService.listActive(tenantId)).find((c) => c.currencyCode === requestedCode)
+      const rate = currencyRow ? Number(currencyRow.rate) || 1 : 1
+      chargeCurrency = currencyRow ? currencyRow.currencyCode : 'USD'
+      chargeAmount = Math.round(totalAmount * rate * 100) / 100
+
+      const storefrontUrl = this.configService.get<string>('STOREFRONT_URL') || 'http://localhost:3000'
+      const apiUrl = this.configService.get<string>('API_PUBLIC_URL') || 'http://localhost:4000'
+      const result = await this.cashfreeService.createOrder({
+        orderId: orderNumber,
+        orderAmount: chargeAmount,
+        currency: chargeCurrency,
+        customer: {
+          customerId: realCustomerId,
+          customerName: customer.customerName,
+          customerEmail: customer.email || '',
+          customerPhone: customer.phone || '',
+        },
+        returnUrl: `${storefrontUrl}/cart/payment-status?order_id={order_id}`,
+        notifyUrl: `${apiUrl}/api/v1/payments/cashfree/webhook`,
+      })
+      cfSession = { cfOrderId: result.cfOrderId, paymentSessionId: result.paymentSessionId }
+    }
+
+    // Every line with its full configuration, so fulfilment sees exactly what
+    // was chosen (stone, metal, size, engraving, earring back…), not just the
+    // first item.
+    const lineItems = cart.items.map((i) => ({
+      lineId: i.lineId || cartLineId(i.productId, i.metadata),
+      productId: i.productId,
+      productName: i.productName,
+      quantity: Number(i.quantity) || 1,
+      unitPrice: Number(i.price) || 0,
+      lineTotal: (Number(i.price) || 0) * (Number(i.quantity) || 1),
+      metalPurity: i.metadata?.metalType ? String(i.metadata.metalType).replace('KT', 'K') : null,
+      metalColor: i.metadata?.metalColor || null,
+      diamondShape: i.metadata?.shape || null,
+      centerDiamondWeight: i.metadata?.centerDiamondWeight || null,
+      diamondColor: i.metadata?.color || null,
+      diamondClarity: i.metadata?.clarity || null,
+      ringSize: i.metadata?.ringSize || null,
+      size: i.metadata?.size || null,
+      engraving: i.metadata?.engraving || null,
+      backType: i.metadata?.backType || null,
+      image: i.metadata?.image || null,
+    }))
+
+    // Per-product dispatch time (product form "Production & dispatch time"),
+    // shown on each line of the confirmation email.
+    const productionTimes: Record<string, string> = {}
+    for (const l of lineItems) {
+      try {
+        const p = await this.productRepo.findOne({ where: { id: l.productId, tenantId } as any })
+        const t = String((p?.metadata as any)?.productionTime || '').trim()
+        if (t) productionTimes[l.productId] = t
+      } catch {
+        /* default timeline */
+      }
+    }
+
     const order = this.orderRepo.create({
       tenantId,
       orderNumber,
-      customerId,
+      lineItems,
+      isTest: isTestOrder(customer.email, dto),
+      customerId: realCustomerId,
       customerName: customer.customerName,
       customerPhone: customer.phone || '',
       customerEmail: customer.email || '',
@@ -315,20 +540,34 @@ export class StorefrontService {
       metalPurity: purity,
       metalColor: firstMeta.metalColor || '',
       diamondShape: firstMeta.shape || '',
-      diamondQuality: '',
+      diamondQuality: firstMeta.clarity || '',
       diamondWeightCt: firstCt,
       productSize: firstMeta.ringSize || firstMeta.size || '',
       quantity: firstItem.quantity,
       totalAmount,
       orderStatus: 'Pending',
       paymentStatus: 'Pending',
-      orderNotes: dto.notes || '',
+      paymentMethod: isOnline ? 'ONLINE' : 'COD',
+      paymentGateway: isOnline ? 'cashfree' : null,
+      cfPaymentSessionId: cfSession?.paymentSessionId || null,
+      currencyCode: isOnline ? chargeCurrency : 'USD',
+      chargedAmount: isOnline ? chargeAmount : null,
+      orderNotes: [dto.notes, cart.coupon?.code && `Coupon ${cart.coupon.code} (−$${discountAmount.toFixed(2)})`]
+        .filter(Boolean)
+        .join(' · '),
+      marketing: MarketingService.sanitize(dto.marketing),
       channel: 'storefront',
       orderDate: new Date().toISOString().slice(0, 10),
     })
 
     const saved = await this.orderRepo.save(order)
-    await this.clearCart(customerId)
+    // Cash-on-delivery orders are confirmed the moment they are placed; online
+    // orders send Purchase from the payment confirmation instead.
+    if (!isOnline) void this.marketingService.sendPurchase(saved.id)
+    await this.clearCart(cartKeyId)
+    if (cart.coupon?.code) {
+      await this.couponsService.incrementUse(tenantId, cart.coupon.code).catch(() => undefined)
+    }
 
     // Fire-and-forget order confirmation email (no-op / console-log in dev
     // until SMTP env vars are set; never blocks or fails checkout).
@@ -338,6 +577,21 @@ export class StorefrontService {
         paymentMethod: dto.paymentMethod || 'COD',
         productName: firstItem.productName,
         shippingAddress: addressText,
+        lines: lineItems.map((l) => ({
+          name: l.productName,
+          quantity: l.quantity,
+          specs: [
+            l.metalPurity && `${l.metalPurity} ${l.metalColor || ''}`.trim(),
+            l.diamondShape,
+            l.centerDiamondWeight && `${l.centerDiamondWeight} ct`,
+            l.diamondColor && `Color ${l.diamondColor}`,
+            l.diamondClarity && `Clarity ${l.diamondClarity}`,
+            l.ringSize && `Size ${l.ringSize}`,
+            l.backType && `${l.backType}`,
+            l.engraving && `Engraving “${l.engraving}”`,
+          ].filter(Boolean) as string[],
+          dispatch: productionTimes[l.productId] || '5–6 business days',
+        })),
       })
       .catch(() => undefined)
 

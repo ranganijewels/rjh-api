@@ -48,6 +48,13 @@ const SEEDS: Seed[] = [
   { kind: 'metal_color', code: 'ROSE', name: 'Rose', sortOrder: 3, metadata: { hex: '#E0A899', applicableMetals: ['GOLD'] } },
   { kind: 'metal_color', code: 'SILVER', name: 'Silver', sortOrder: 4, metadata: { hex: '#C0C0C0', applicableMetals: ['SILVER'] } },
   { kind: 'metal_color', code: 'PLATINUM', name: 'Platinum', sortOrder: 5, metadata: { hex: '#D6D6D6', applicableMetals: ['PLATINUM'] } },
+  // Product badges (metadata.hex) — shown on storefront product cards + PDP.
+  // A product can carry any number of these at once (Product.metadata.badges: string[]).
+  { kind: 'product_badge', code: 'NEW', name: 'New', sortOrder: 1, metadata: { hex: '#162640' } },
+  { kind: 'product_badge', code: 'BESTSELLER', name: 'Bestseller', sortOrder: 2, metadata: { hex: '#B8860B' } },
+  { kind: 'product_badge', code: 'SALE', name: 'Sale', sortOrder: 3, metadata: { hex: '#B33A3A' } },
+  { kind: 'product_badge', code: 'LIMITED_EDITION', name: 'Limited Edition', sortOrder: 4, metadata: { hex: '#5B3A8E' } },
+  { kind: 'product_badge', code: 'EXCLUSIVE', name: 'Exclusive', sortOrder: 5, metadata: { hex: '#0F5C4C' } },
   // Diamond quality (clarity-led grades)
   { kind: 'diamond_quality', code: 'FL', name: 'FL (Flawless)', sortOrder: 1 },
   { kind: 'diamond_quality', code: 'IF', name: 'IF (Internally Flawless)', sortOrder: 2 },
@@ -130,7 +137,7 @@ const SEEDS: Seed[] = [
 // Kinds introduced after the initial launch: on an already-provisioned tenant,
 // seedDefaults() never re-runs its bulk-insert branch, so any kind added here
 // also needs an entry below or it silently never appears outside a fresh DB.
-const BACKFILL_KINDS = ['category', 'style', 'collection', 'component_type', 'stone_type', 'diamond_color']
+const BACKFILL_KINDS = ['category', 'style', 'collection', 'component_type', 'stone_type', 'diamond_color', 'product_badge']
 
 @Injectable()
 export class CatalogSeeder {

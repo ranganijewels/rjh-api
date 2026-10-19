@@ -43,6 +43,14 @@ export class Collection {
   @Column({ name: 'product_ids', type: 'jsonb', default: '[]' })
   productIds: string[]
 
+  // When true, every member product behaves as a variant of every other
+  // member (e.g. an "Initials" collection where A/B/C/... are all one
+  // "family") — the PDP shows a switcher to jump between siblings, using
+  // each product's metadata.variantLabel as the button text. Off by default;
+  // most collections (Bridal, Best Sellers, ...) are NOT variant groups.
+  @Column({ name: 'variant_mode', type: 'boolean', default: false })
+  variantMode: boolean
+
   @Column({ default: 'active' })
   status: string
 

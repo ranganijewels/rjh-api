@@ -87,6 +87,7 @@ export class ReportsService {
       .createQueryBuilder('order')
       .where('order.tenantId = :tenantId', { tenantId })
       .andWhere('order.isDeleted = false')
+      .andWhere('order.isTest = false')
       .andWhere('order.createdAt >= :from', { from })
       .andWhere('order.createdAt <= :to', { to })
       .getMany()
