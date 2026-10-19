@@ -9,7 +9,7 @@ const MODEL_IDS: Record<string, string> = {
 }
 
 // Kept in sync with the storefront's resolveTokens() vocabulary
-// (elova_frontend .../src/lib/resolveTokens.js) — adding a token here without
+// (storefront src/lib/resolveTokens.js) — adding a token here without
 // adding it there just leaves literal "{{...}}" text on the page.
 const SUPPORTED_TOKENS = [
   '{{metal_type}}', '{{karat}}', '{{metal_color}}',

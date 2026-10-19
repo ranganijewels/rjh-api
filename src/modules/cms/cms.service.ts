@@ -375,8 +375,8 @@ export class CmsService {
 
     // Mega-menu content for the storefront header's 5 rich dropdowns
     // (Engagement/Wedding/Jewelry/Customize/About Us). Ported verbatim from
-    // the previously-hardcoded `MENUS_OPTIONS`/`mediaCategories` in
-    // `elova_frontend_apr_2026 (1)/src/components/layout/Navbar/constant.js`
+    // the previously-hardcoded `MENUS_OPTIONS`/`mediaCategories` in the
+    // storefront `src/components/layout/Navbar/constant.js`
     // so seeding this produces the exact menu that's already live — only
     // subsequent admin edits change anything. Items that were plain strings
     // in the original array (no real link) are normalized to
