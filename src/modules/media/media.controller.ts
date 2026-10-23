@@ -24,10 +24,16 @@ import {
 import { MediaService } from './media.service'
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard'
 import { RolesGuard } from '../../common/guards/roles.guard'
+import { Roles } from '../../common/decorators/roles.decorator'
 
 @ApiTags('Media')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, RolesGuard)
+// Upload + delete were reachable by ANY authenticated user (RolesGuard passes
+// routes with no @Roles metadata), so a storefront customer could write to —
+// and DELETE objects from — any bucket, including cms-media. Staff and above
+// only; viewer/customer are locked out (super_admin/admin pass via hierarchy).
+@Roles('manager', 'staff', 'admin')
 @Controller('media')
 export class MediaController {
   constructor(private readonly mediaService: MediaService) {}
