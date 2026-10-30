@@ -297,7 +297,7 @@ export class SeoService {
 
   async schemaForProduct(tenantId: string, productId: string) {
     const product = await this.products.findOne({
-      where: { id: productId, tenantId },
+      where: { id: productId, tenantId, isDeleted: false },
       relations: ['media'],
     })
     if (!product) throw new NotFoundException('Product not found')

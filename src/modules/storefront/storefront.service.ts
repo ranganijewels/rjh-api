@@ -6,7 +6,7 @@ import {
 } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
 import { MarketingService } from '../marketing/marketing.service'
-import { Repository } from 'typeorm'
+import { In, Repository } from 'typeorm'
 import { CACHE_MANAGER } from '@nestjs/cache-manager'
 import { Cache } from 'cache-manager'
 import { Customer, CustomerType } from '../../database/entities/customer.entity'
@@ -390,6 +390,18 @@ export class StorefrontService {
     // From here on, orders/Cashfree/emails always use the real customer's id
     // — never the guest session id, which only ever identified the cart.
     const realCustomerId = customer.id
+
+    // A product deleted or switched off after it went into the cart must not be
+    // sold. Checked up front because the re-pricing below falls back to the
+    // cart's captured price when a product can't be priced.
+    const cartProductIds = [...new Set(cart.items.map((i) => i.productId))]
+    const sellable = await this.productRepo.find({
+      where: { id: In(cartProductIds), tenantId, isDeleted: false, status: In(['active', 'Published', 'Approved']) } as any,
+      select: ['id'],
+    })
+    if (sellable.length !== cartProductIds.length) {
+      throw new BadRequestException('Some items in your bag are no longer available. Please remove them and try again.')
+    }
 
     // Re-price every line item from the Pricing Engine server-side so the order
     // total is authoritative and tamper-proof (never trust the client price).

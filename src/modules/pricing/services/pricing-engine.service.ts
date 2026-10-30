@@ -101,7 +101,7 @@ export class PricingEngineService {
     const hit = this.cache.get(cacheKey)
     if (hit && Date.now() - hit.at < this.TTL_MS) return hit.data
 
-    const p = await this.productRepo.findOne({ where: { id: productId, tenantId } as any })
+    const p = await this.productRepo.findOne({ where: { id: productId, tenantId, isDeleted: false } as any })
     if (!p) throw new NotFoundException(`Product ${productId} not found`)
 
     // Per-line diamonds from the Materials BOM — each priced by its own
@@ -184,7 +184,7 @@ export class PricingEngineService {
   // Diamond colour/clarity choices for a product's centre stone (or its main
   // diamond line when there is no centre stone), at the selected carat.
   async diamondOptions(tenantId: string, productId: string, carat?: number) {
-    const p = await this.productRepo.findOne({ where: { id: productId, tenantId } as any })
+    const p = await this.productRepo.findOne({ where: { id: productId, tenantId, isDeleted: false } as any })
     if (!p) throw new NotFoundException(`Product ${productId} not found`)
     const materials = Array.isArray((p.metadata as any)?.materials) ? (p.metadata as any).materials : []
     const diamonds = materials
