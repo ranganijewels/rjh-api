@@ -27,7 +27,7 @@ jobs:
       - name: Rsync source to VPS
         run: |
           rsync -az --delete \
-            --exclude '.git' --exclude 'node_modules' --exclude '.next' --exclude 'dist' \
+            --exclude '.git' --exclude 'node_modules' --exclude '.next' --exclude 'dist' --exclude '.releases' \
             --exclude '.env' --exclude '.env.*' --exclude 'public/uploads' \
             -e "ssh -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=no" \
             ./ root@177.7.58.193:/var/www/rangani/api/
