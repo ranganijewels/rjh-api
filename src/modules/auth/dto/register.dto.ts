@@ -16,13 +16,14 @@ export class RegisterDto {
   fullName: string
 
   @ApiPropertyOptional({
-    example: 'staff',
+    example: 'customer',
     enum: ['admin', 'manager', 'staff', 'viewer', 'customer'],
-    default: 'staff',
+    default: 'customer',
+    description: 'Roles other than customer require an admin bearer token',
   })
   @IsOptional()
   @IsIn(['admin', 'manager', 'staff', 'viewer', 'customer'])
-  role?: string = 'staff'
+  role?: string = 'customer'
 
   @ApiPropertyOptional({ example: 'uuid-tenant-id' })
   @IsOptional()

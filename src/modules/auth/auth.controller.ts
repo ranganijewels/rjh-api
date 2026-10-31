@@ -54,11 +54,13 @@ export class AuthController {
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Register a new user account' })
   @ApiResponse({ status: 201, description: 'User registered successfully' })
+  @ApiResponse({ status: 403, description: 'Staff roles require an admin token' })
   @ApiResponse({ status: 409, description: 'Email already in use' })
   async register(
     @Body() dto: RegisterDto,
+    @Req() req: Request,
   ): Promise<{ message: string; user: Record<string, any> }> {
-    const result = await this.authService.register(dto)
+    const result = await this.authService.register(dto, req.headers.authorization)
     return { message: 'User registered', user: result.user }
   }
 

@@ -2,6 +2,7 @@ import {
   Injectable,
   UnauthorizedException,
   ConflictException,
+  ForbiddenException,
   NotFoundException,
   Inject,
   Logger,
@@ -71,7 +72,13 @@ export class AuthService {
     return { ...tokens, user: safeUser }
   }
 
-  async register(dto: RegisterDto): Promise<{ user: Partial<User> }> {
+  async register(dto: RegisterDto, authHeader?: string): Promise<{ user: Partial<User> }> {
+    // The route is public so storefront shoppers can sign up. Anything above
+    // `customer` is a staff account and may only be created by a signed-in admin
+    // (the admin panel's user-management form forwards its token).
+    const role = dto.role ?? 'customer'
+    if (role !== 'customer') await this.assertAdminCaller(authHeader)
+
     const existing = await this.userRepo.findOne({ where: { email: dto.email.toLowerCase() } })
     if (existing) throw new ConflictException('Email already in use')
 
@@ -83,7 +90,7 @@ export class AuthService {
         email: dto.email.toLowerCase(),
         passwordHash,
         fullName: dto.fullName,
-        role: (dto.role as any) ?? 'staff',
+        role: role as any,
         tenantId,
         isActive: true,
       }),
@@ -92,6 +99,29 @@ export class AuthService {
     const { passwordHash: _p, ...safeUser } = user as any
     return { user: safeUser }
   }
+  private async assertAdminCaller(authHeader?: string): Promise<void> {
+    const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : undefined
+    if (!token) throw new ForbiddenException('Only admins can create staff accounts')
+
+    let payload: { sub?: string }
+    try {
+      payload = await this.jwtService.verifyAsync(token, {
+        secret:
+          this.configService.get('jwt.publicKey') ||
+          this.configService.get('jwt.privateKey') ||
+          'fallback-secret',
+        algorithms: ['RS256', 'HS256'],
+      })
+    } catch {
+      throw new UnauthorizedException('Invalid or expired token')
+    }
+
+    const caller = await this.userRepo.findOne({ where: { id: payload.sub, isActive: true } })
+    if (!caller || !['admin', 'super_admin'].includes(caller.role)) {
+      throw new ForbiddenException('Only admins can create staff accounts')
+    }
+  }
+
 
   async refreshTokens(rawToken: string, ip?: string, userAgent?: string): Promise<TokenPair> {
     const tokenHash = this.hash(rawToken)
