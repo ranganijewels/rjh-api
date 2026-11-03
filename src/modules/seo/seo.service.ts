@@ -487,6 +487,10 @@ export class SeoService {
       order: { priority: 'DESC' },
     })
     for (const p of pages) {
+      // The storefront 404s a landing page with nothing to buy (only facet
+      // pages carry products), so list only facet pages that match a live
+      // product; they reappear once matching products are published.
+      if (p.type !== 'facet' || !(await this.facetQuery(tenantId, p).getCount())) continue
       push(`/collections/${this.normalizeSlug(p.urlSlug)}`, p.lastmod || p.updatedAt || p.createdAt, Number(p.priority) || 0.5)
     }
 
