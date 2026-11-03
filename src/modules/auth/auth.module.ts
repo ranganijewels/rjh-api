@@ -5,13 +5,14 @@ import { PassportModule } from '@nestjs/passport'
 import { ConfigService } from '@nestjs/config'
 import { User } from '../../database/entities/user.entity'
 import { RefreshToken } from '../../database/entities/refresh-token.entity'
+import { PasswordResetToken } from '../../database/entities/password-reset-token.entity'
 import { AuthService } from './auth.service'
 import { AuthController } from './auth.controller'
 import { JwtStrategy } from './strategies/jwt.strategy'
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([User, RefreshToken]),
+    TypeOrmModule.forFeature([User, RefreshToken, PasswordResetToken]),
     PassportModule.register({ defaultStrategy: 'jwt' }),
     JwtModule.registerAsync({
       inject: [ConfigService],

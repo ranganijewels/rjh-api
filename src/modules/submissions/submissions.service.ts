@@ -5,6 +5,7 @@ import { CustomRequest } from '../../database/entities/custom-request.entity'
 import { ResizeRepairRequest } from '../../database/entities/resize-repair-request.entity'
 import { Appointment } from '../../database/entities/appointment.entity'
 import { ContactSubmission } from '../../database/entities/contact-submission.entity'
+import { NewsletterSubscriber } from '../../database/entities/newsletter-subscriber.entity'
 import { MarketingService } from '../marketing/marketing.service'
 import { EmailService } from '../../infrastructure/email/email.service'
 
@@ -63,6 +64,9 @@ export class SubmissionsService {
 
     @InjectRepository(ContactSubmission)
     public readonly contacts: Repository<ContactSubmission>,
+
+    @InjectRepository(NewsletterSubscriber)
+    private readonly subscribers: Repository<NewsletterSubscriber>,
 
     private readonly email: EmailService,
 
@@ -186,6 +190,37 @@ export class SubmissionsService {
   // contact@/info@ranganijewelry.com (override via CONTACT_NOTIFY_EMAIL) plus
   // a short acknowledgement back to the sender, mirroring bookAppointment()'s
   // pattern above. Never blocks the save if email delivery fails.
+  // ─── Newsletter ───────────────────────────────────────────────────────────
+
+  /** Adds (or re-subscribes) an email. Idempotent, so repeat sign-ups succeed. */
+  async subscribeNewsletter(tenantId: string, dto: { email?: string; source?: string }) {
+    if (!tenantId) throw new BadRequestException('Missing tenant')
+    const email = String(dto.email ?? '').trim().toLowerCase()
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 255) {
+      throw new BadRequestException('Enter a valid email address')
+    }
+    const source = dto.source ? String(dto.source).slice(0, 50) : null
+    const existing = await this.subscribers.findOne({ where: { tenantId, email } })
+    if (existing) {
+      if (existing.status !== 'subscribed') {
+        existing.status = 'subscribed'
+        existing.subscribedAt = new Date()
+        await this.subscribers.save(existing)
+      }
+      return { subscribed: true }
+    }
+    await this.subscribers.save(
+      this.subscribers.create({ tenantId, email, source, status: 'subscribed', subscribedAt: new Date() }),
+    )
+    return { subscribed: true }
+  }
+
+  listNewsletter(tenantId: string, status?: string) {
+    const where: any = { tenantId }
+    if (status) where.status = status
+    return this.subscribers.find({ where, order: { createdAt: 'DESC' } })
+  }
+
   async createContact(tenantId: string, dto: any) {
     const row = this.contacts.create({ ...dto, marketing: MarketingService.sanitize(dto.marketing), tenantId, status: dto.status || 'new' })
     const saved = await this.contacts.save(row)

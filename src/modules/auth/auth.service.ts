@@ -4,6 +4,7 @@ import {
   ConflictException,
   ForbiddenException,
   NotFoundException,
+  BadRequestException,
   Inject,
   Logger,
 } from '@nestjs/common'
@@ -17,6 +18,8 @@ import * as bcrypt from 'bcrypt'
 import * as crypto from 'crypto'
 import { User } from '../../database/entities/user.entity'
 import { RefreshToken } from '../../database/entities/refresh-token.entity'
+import { PasswordResetToken } from '../../database/entities/password-reset-token.entity'
+import { EmailService } from '../../infrastructure/email/email.service'
 import { LoginDto } from './dto/login.dto'
 import { RegisterDto } from './dto/register.dto'
 
@@ -32,6 +35,14 @@ interface AuthResponse extends TokenPair {
 const LOCKOUT_MAX = 5
 const LOCKOUT_TTL = 15 * 60
 
+// Password reset: links live 30 minutes; at most 3 emails per address per 15 minutes.
+const RESET_TTL_MINUTES = 30
+const RESET_MAX_PER_WINDOW = 3
+const RESET_WINDOW = 15 * 60
+
+const esc = (v: any) =>
+  String(v ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c] as string)
+
 @Injectable()
 export class AuthService {
   private readonly logger = new Logger(AuthService.name)
@@ -41,10 +52,13 @@ export class AuthService {
     private readonly userRepo: Repository<User>,
     @InjectRepository(RefreshToken)
     private readonly rtRepo: Repository<RefreshToken>,
+    @InjectRepository(PasswordResetToken)
+    private readonly resetRepo: Repository<PasswordResetToken>,
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
     @Inject(CACHE_MANAGER)
     private readonly cache: Cache,
+    private readonly email: EmailService,
   ) {}
 
   async login(dto: LoginDto, ip?: string, userAgent?: string): Promise<AuthResponse> {
@@ -199,6 +213,64 @@ export class AuthService {
       return this.jwtService.sign(payload, { algorithm: 'RS256', expiresIn, privateKey })
     }
     return this.jwtService.sign(payload, { algorithm: 'HS256', expiresIn })
+  }
+
+  // ─── Password reset ──────────────────────────────────────────────────────
+
+  /**
+   * Emails a one-time reset link when the address belongs to an active
+   * account. Always resolves the same way so the endpoint cannot be used to
+   * find out which emails are registered.
+   */
+  async requestPasswordReset(rawEmail: string): Promise<void> {
+    const email = rawEmail.trim().toLowerCase()
+    const rateKey = `auth:reset:${email}`
+    const sent = (await this.cache.get<number>(rateKey)) ?? 0
+    if (sent >= RESET_MAX_PER_WINDOW) return
+
+    const user = await this.userRepo.findOne({ where: { email, isActive: true } })
+    if (!user) return
+    await this.cache.set(rateKey, sent + 1, RESET_WINDOW * 1000)
+
+    // Only the newest link works.
+    await this.resetRepo.delete({ userId: user.id })
+    const raw = crypto.randomBytes(32).toString('hex')
+    await this.resetRepo.save(
+      this.resetRepo.create({
+        userId: user.id,
+        tokenHash: this.hash(raw),
+        expiresAt: new Date(Date.now() + RESET_TTL_MINUTES * 60 * 1000),
+      }),
+    )
+
+    const base = (this.configService.get<string>('STOREFRONT_URL') || 'http://localhost:3000').replace(/\/$/, '')
+    const link = `${base}/reset-password?token=${raw}`
+    const name = user.fullName?.split(' ')[0] || 'there'
+    await this.email.sendMail(
+      user.email,
+      'Reset your Rangani Jewelry House password',
+      `<p>Hi ${esc(name)},</p>` +
+        `<p>We received a request to reset your password. Use the link below to choose a new one. ` +
+        `It works once and expires in ${RESET_TTL_MINUTES} minutes.</p>` +
+        `<p><a href="${link}">Reset your password</a></p>` +
+        `<p>If you didn't ask for this, you can ignore this email; your password stays the same.</p>`,
+    )
+  }
+
+  /** Sets a new password from a valid reset link, then signs the account out everywhere. */
+  async resetPassword(rawToken: string, newPassword: string): Promise<void> {
+    const record = await this.resetRepo.findOne({ where: { tokenHash: this.hash(rawToken) } })
+    if (!record || record.usedAt || record.expiresAt < new Date()) {
+      throw new BadRequestException('This reset link is invalid or has expired. Request a new one.')
+    }
+
+    const passwordHash = await bcrypt.hash(newPassword, 12)
+    await this.userRepo.update(record.userId, { passwordHash, failedLoginAttempts: 0, lockedUntil: null })
+    await this.resetRepo.update(record.id, { usedAt: new Date() })
+    await this.rtRepo.update({ userId: record.userId, revoked: false }, { revoked: true, revokedAt: new Date() })
+
+    const user = await this.userRepo.findOne({ where: { id: record.userId } })
+    if (user) await this.cache.del(`auth:lock:${user.email}`)
   }
 
   private hash(token: string): string {

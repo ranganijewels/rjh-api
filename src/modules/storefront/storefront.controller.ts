@@ -11,10 +11,12 @@ import {
   Version,
   HttpCode,
   HttpStatus,
+  ParseUUIDPipe,
 } from '@nestjs/common'
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger'
 import { Query } from '@nestjs/common'
 import { StorefrontService, CheckoutDto } from './storefront.service'
+import { SizeProfilesService } from './size-profiles.service'
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard'
 import { CartAccessGuard } from '../../common/guards/cart-access.guard'
 import { CurrentUser } from '../../common/decorators/current-user.decorator'
@@ -24,7 +26,10 @@ import { Public } from '../../common/decorators/public.decorator'
 @ApiBearerAuth()
 @Controller('storefront')
 export class StorefrontController {
-  constructor(private readonly storefrontService: StorefrontService) {}
+  constructor(
+    private readonly storefrontService: StorefrontService,
+    private readonly sizeProfiles: SizeProfilesService,
+  ) {}
 
   // ─── Cart ───────────────────────────────────────────────────────────────
   // Guest-checkout: CartAccessGuard accepts either a real JWT (logged-in
@@ -149,6 +154,45 @@ export class StorefrontController {
     @Body() body: { productId: string; productData?: Record<string, any> },
   ) {
     return this.storefrontService.toggleWishlist(customerId, body.productId, body.productData || {})
+  }
+
+  // ─── Size profiles ────────────────────────────────────────────────────────
+
+  @Get('size-profiles')
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Get saved size profiles for current customer' })
+  getSizeProfiles(@CurrentUser('id') userId: string) {
+    return this.sizeProfiles.list(userId)
+  }
+
+  @Post('size-profiles')
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Add a size profile' })
+  addSizeProfile(
+    @CurrentUser('id') userId: string,
+    @CurrentUser('tenantId') tenantId: string,
+    @Body() body: Record<string, any>,
+  ) {
+    return this.sizeProfiles.create(userId, tenantId, body)
+  }
+
+  @Patch('size-profiles/:id')
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Update a size profile' })
+  updateSizeProfile(
+    @CurrentUser('id') userId: string,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: Record<string, any>,
+  ) {
+    return this.sizeProfiles.update(userId, id, body)
+  }
+
+  @Delete('size-profiles/:id')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Delete a size profile' })
+  deleteSizeProfile(@CurrentUser('id') userId: string, @Param('id', ParseUUIDPipe) id: string) {
+    return this.sizeProfiles.remove(userId, id)
   }
 
   // ─── Addresses ────────────────────────────────────────────────────────────
