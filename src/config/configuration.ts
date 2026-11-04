@@ -23,6 +23,9 @@ export default () => ({
     host: process.env.REDIS_HOST || 'localhost',
     port: parseInt(process.env.REDIS_PORT, 10) || 6379,
     password: process.env.REDIS_PASSWORD || undefined,
+    // Redis database number (0–15). Live uses 0, staging 1, so the two can
+    // share one Redis server without overwriting each other's carts.
+    db: parseInt(process.env.REDIS_DB, 10) || 0,
   },
 
   minio: {
@@ -64,6 +67,8 @@ export default () => ({
     user: process.env.SMTP_USER,
     pass: process.env.SMTP_PASS,
     from: process.env.EMAIL_FROM || 'RJ House <noreply@rjhouse.com>',
+    // Put in front of every subject, e.g. "[STAGING]". Empty on live.
+    subjectPrefix: (process.env.EMAIL_SUBJECT_PREFIX || '').trim(),
   },
 
   throttle: {

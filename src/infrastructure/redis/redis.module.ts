@@ -16,6 +16,7 @@ import { redisStore } from 'cache-manager-redis-yet'
             port: config.get<number>('redis.port'),
           },
           password: config.get<string>('redis.password'),
+          database: config.get<number>('redis.db', 0),
         }),
         ttl: 300,
       }),
