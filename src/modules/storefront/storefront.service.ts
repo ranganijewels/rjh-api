@@ -320,6 +320,26 @@ export class StorefrontService {
 
   // ─── Checkout ─────────────────────────────────────────────────────────────
 
+  /**
+   * What the checkout page needs before the customer pays: which Cashfree
+   * mode is active and, when online payments are charged in a fixed currency,
+   * that currency and its rate from USD (so the exact amount can be shown).
+   */
+  async paymentOptions(tenantId: string) {
+    const forced = this.cashfreeService.chargeCurrency
+    let rate: number | null = null
+    if (forced && forced !== 'USD') {
+      const row = (await this.currencyService.listActive(tenantId)).find((c) => c.currencyCode === forced)
+      rate = row ? Number(row.rate) || null : null
+    }
+    return {
+      mode: this.cashfreeService.mode,
+      chargeCurrency: forced,
+      rate: forced === 'USD' ? 1 : rate,
+      onlineAvailable: this.cashfreeService.isConfigured() && (!forced || forced === 'USD' || !!rate),
+    }
+  }
+
   async checkout(
     tenantId: string,
     customerId: string,
@@ -469,11 +489,16 @@ export class StorefrontService {
     let chargeCurrency = 'USD'
     let chargeAmount = totalAmount
     if (isOnline) {
-      const requestedCode = (dto.currencyCode || 'USD').toUpperCase()
+      const forced = this.cashfreeService.chargeCurrency
+      const requestedCode = (forced || dto.currencyCode || 'USD').toUpperCase()
       const currencyRow =
         requestedCode === 'USD'
           ? null
           : (await this.currencyService.listActive(tenantId)).find((c) => c.currencyCode === requestedCode)
+      if (forced && forced !== 'USD' && !currencyRow) {
+        // Never fall back to USD here: the account may not accept it.
+        throw new BadRequestException(`Online payment is unavailable right now (no ${forced} exchange rate). Please choose cash on delivery or try again later.`)
+      }
       const rate = currencyRow ? Number(currencyRow.rate) || 1 : 1
       chargeCurrency = currencyRow ? currencyRow.currencyCode : 'USD'
       chargeAmount = Math.round(totalAmount * rate * 100) / 100

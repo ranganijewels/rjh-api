@@ -39,6 +39,15 @@ export class CashfreeService {
     return env === 'production' ? 'production' : 'sandbox'
   }
 
+  /**
+   * When CASHFREE_CHARGE_CURRENCY is set (e.g. INR), every online payment is
+   * charged in that currency, whatever the shopper is browsing in. Used while
+   * the Cashfree account only accepts domestic (INR) payments.
+   */
+  get chargeCurrency(): string | null {
+    return (this.configService.get<string>('CASHFREE_CHARGE_CURRENCY') || '').trim().toUpperCase() || null
+  }
+
   private get baseUrl(): string {
     return this.mode === 'production' ? 'https://api.cashfree.com/pg' : 'https://sandbox.cashfree.com/pg'
   }
