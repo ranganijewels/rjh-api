@@ -8,10 +8,12 @@ export class EmailService {
   private readonly logger = new Logger(EmailService.name)
   private readonly transporter: Transporter
   private readonly from: string
+  private readonly subjectPrefix: string
 
   constructor(private readonly config: ConfigService) {
     // Reads the `smtp.*` config block (SMTP_HOST/PORT/USER/PASS/… env vars).
     this.from = this.config.get<string>('smtp.from', 'RJ House <noreply@rjhouse.com>')
+    this.subjectPrefix = this.config.get<string>('smtp.subjectPrefix', '')
 
     const smtpUser = this.config.get<string>('smtp.user')
     if (smtpUser) {
@@ -33,6 +35,8 @@ export class EmailService {
    * Send a generic email.
    */
   async sendMail(to: string, subject: string, html: string): Promise<void> {
+    // Every email goes through here, so a staging server tags them all.
+    if (this.subjectPrefix) subject = `${this.subjectPrefix} ${subject}`
     try {
       await this.transporter.sendMail({
         from: this.from,
