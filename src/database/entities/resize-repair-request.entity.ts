@@ -30,7 +30,7 @@ export class ResizeRepairRequest {
   orderNumber: string | null
 
   @Column({ type: 'varchar', default: 'resize' })
-  serviceType: 'resize' | 'repair' | 'polish' | 'replating' | 'other'
+  serviceType: 'resize' | 'repair' | 'return' | 'polish' | 'replating' | 'other'
 
   @Column({ type: 'text', nullable: true })
   details: string | null

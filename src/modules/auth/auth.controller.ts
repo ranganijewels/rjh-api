@@ -16,11 +16,14 @@ import {
   ApiResponse,
   ApiBearerAuth,
 } from '@nestjs/swagger'
+import { Throttle } from '@nestjs/throttler'
 import { Request } from 'express'
 import { AuthService } from './auth.service'
 import { LoginDto } from './dto/login.dto'
 import { RegisterDto } from './dto/register.dto'
 import { RefreshTokenDto } from './dto/refresh-token.dto'
+import { ForgotPasswordDto } from './dto/forgot-password.dto'
+import { ResetPasswordDto } from './dto/reset-password.dto'
 import { Public } from '../../common/decorators/public.decorator'
 import { CurrentUser } from '../../common/decorators/current-user.decorator'
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard'
@@ -62,6 +65,35 @@ export class AuthController {
   ): Promise<{ message: string; user: Record<string, any> }> {
     const result = await this.authService.register(dto, req.headers.authorization)
     return { message: 'User registered', user: result.user }
+  }
+
+  // ─── POST /auth/forgot-password ──────────────────────────────────────────
+
+  // Behind nginx every caller shares one IP, so this route limit only stops
+  // floods; the per-email limit lives in AuthService.requestPasswordReset.
+  @Public()
+  @Throttle({ default: { limit: 20, ttl: 60_000 } })
+  @Post('forgot-password')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Email a one-time password reset link' })
+  @ApiResponse({ status: 200, description: 'Same response whether or not the email has an account' })
+  async forgotPassword(@Body() dto: ForgotPasswordDto): Promise<{ message: string }> {
+    await this.authService.requestPasswordReset(dto.email)
+    return { message: 'If an account exists for that email, a reset link is on its way.' }
+  }
+
+  // ─── POST /auth/reset-password ───────────────────────────────────────────
+
+  @Public()
+  @Throttle({ default: { limit: 20, ttl: 60_000 } })
+  @Post('reset-password')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Set a new password from a reset link' })
+  @ApiResponse({ status: 200, description: 'Password changed; existing sessions are signed out' })
+  @ApiResponse({ status: 400, description: 'Link invalid, used or expired' })
+  async resetPassword(@Body() dto: ResetPasswordDto): Promise<{ message: string }> {
+    await this.authService.resetPassword(dto.token, dto.newPassword)
+    return { message: 'Password updated. You can log in with your new password.' }
   }
 
   // ─── POST /auth/refresh ──────────────────────────────────────────────────

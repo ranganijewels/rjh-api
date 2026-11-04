@@ -5,6 +5,7 @@ import { CustomRequest } from '../../database/entities/custom-request.entity'
 import { ResizeRepairRequest } from '../../database/entities/resize-repair-request.entity'
 import { Appointment } from '../../database/entities/appointment.entity'
 import { ContactSubmission } from '../../database/entities/contact-submission.entity'
+import { NewsletterSubscriber } from '../../database/entities/newsletter-subscriber.entity'
 import { MarketingService } from '../marketing/marketing.service'
 import { EmailService } from '../../infrastructure/email/email.service'
 
@@ -32,6 +33,29 @@ type AnyRepo = Repository<any>
 
 const esc = (v: any) =>
   String(v ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c] as string)
+
+// Team notification emails: hide internal columns and show readable labels.
+const HIDDEN_FIELDS = ['id', 'tenantId', 'customerId', 'createdAt', 'updatedAt', 'status']
+const FIELD_LABELS: Record<string, string> = {
+  name: 'Name',
+  email: 'Email',
+  phone: 'Phone',
+  orderNumber: 'Order number',
+  serviceType: 'Type',
+  details: 'Details',
+}
+const SERVICE_LABELS: Record<string, string> = {
+  resize: 'Resize',
+  repair: 'Repair',
+  return: 'Return',
+  polish: 'Polish',
+  replating: 'Replating',
+  other: 'Other',
+}
+const titleCase = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)
+// camelCase column → "Sentence case" label for anything not listed above.
+const fieldLabel = (key: string) =>
+  FIELD_LABELS[key] || titleCase(key.replace(/([a-z0-9])([A-Z])/g, '$1 $2').toLowerCase())
 
 const NOTIFY_TO = () => process.env.CONTACT_NOTIFY_EMAIL || 'contact@ranganijewelry.com,info@ranganijewelry.com'
 
@@ -64,6 +88,9 @@ export class SubmissionsService {
     @InjectRepository(ContactSubmission)
     public readonly contacts: Repository<ContactSubmission>,
 
+    @InjectRepository(NewsletterSubscriber)
+    private readonly subscribers: Repository<NewsletterSubscriber>,
+
     private readonly email: EmailService,
 
     private readonly marketing: MarketingService,
@@ -87,8 +114,11 @@ export class SubmissionsService {
   // Every inbound request reaches the team's mailbox, not just the inbox.
   async notifyTeam(kind: string, row: any) {
     const fields = Object.entries(row || {})
-      .filter(([k, v]) => v != null && v !== '' && !['id', 'tenantId', 'createdAt', 'updatedAt', 'status'].includes(k) && typeof v !== 'object')
-      .map(([k, v]) => `<tr><td style="color:#6b7280;padding:2px 8px 2px 0">${esc(k)}</td><td>${esc(v).replace(/\n/g, '<br>')}</td></tr>`)
+      .filter(([k, v]) => v != null && v !== '' && !HIDDEN_FIELDS.includes(k) && typeof v !== 'object')
+      .map(([k, v]) => {
+        const value = k === 'serviceType' ? SERVICE_LABELS[String(v)] || titleCase(String(v)) : String(v)
+        return `<tr><td style="color:#6b7280;padding:2px 12px 2px 0;vertical-align:top">${esc(fieldLabel(k))}</td><td>${esc(value).replace(/\n/g, '<br>')}</td></tr>`
+      })
       .join('')
     await this.email
       .sendMail(NOTIFY_TO(), `New ${kind} — Rangani website`, `<p>A new ${esc(kind)} was submitted on the website.</p><table>${fields}</table>`)
@@ -176,7 +206,10 @@ export class SubmissionsService {
     const saved = await repo.save(row)
     void this.marketing.sendFormEvent('Lead', (saved as any).marketing, { email: (dto as any).email, phone: (dto as any).phone }, { content_name: repo === this.customRequests ? 'custom_design' : 'resize_repair' })
     if (repo === this.customRequests) await this.notifyTeam('custom design request', saved)
-    else if (repo === this.resizeRepairs) await this.notifyTeam('resize / repair request', saved)
+    else if (repo === this.resizeRepairs) {
+      const type = SERVICE_LABELS[(saved as any).serviceType]?.toLowerCase() || 'resize / repair'
+      await this.notifyTeam(`${type} request`, saved)
+    }
     return saved
   }
 
@@ -186,6 +219,37 @@ export class SubmissionsService {
   // contact@/info@ranganijewelry.com (override via CONTACT_NOTIFY_EMAIL) plus
   // a short acknowledgement back to the sender, mirroring bookAppointment()'s
   // pattern above. Never blocks the save if email delivery fails.
+  // ─── Newsletter ───────────────────────────────────────────────────────────
+
+  /** Adds (or re-subscribes) an email. Idempotent, so repeat sign-ups succeed. */
+  async subscribeNewsletter(tenantId: string, dto: { email?: string; source?: string }) {
+    if (!tenantId) throw new BadRequestException('Missing tenant')
+    const email = String(dto.email ?? '').trim().toLowerCase()
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 255) {
+      throw new BadRequestException('Enter a valid email address')
+    }
+    const source = dto.source ? String(dto.source).slice(0, 50) : null
+    const existing = await this.subscribers.findOne({ where: { tenantId, email } })
+    if (existing) {
+      if (existing.status !== 'subscribed') {
+        existing.status = 'subscribed'
+        existing.subscribedAt = new Date()
+        await this.subscribers.save(existing)
+      }
+      return { subscribed: true }
+    }
+    await this.subscribers.save(
+      this.subscribers.create({ tenantId, email, source, status: 'subscribed', subscribedAt: new Date() }),
+    )
+    return { subscribed: true }
+  }
+
+  listNewsletter(tenantId: string, status?: string) {
+    const where: any = { tenantId }
+    if (status) where.status = status
+    return this.subscribers.find({ where, order: { createdAt: 'DESC' } })
+  }
+
   async createContact(tenantId: string, dto: any) {
     const row = this.contacts.create({ ...dto, marketing: MarketingService.sanitize(dto.marketing), tenantId, status: dto.status || 'new' })
     const saved = await this.contacts.save(row)

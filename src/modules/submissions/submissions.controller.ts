@@ -13,6 +13,7 @@ import {
   HttpStatus,
 } from '@nestjs/common'
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger'
+import { Throttle } from '@nestjs/throttler'
 import { SubmissionsService } from './submissions.service'
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard'
 import { RolesGuard } from '../../common/guards/roles.guard'
@@ -213,6 +214,32 @@ export class SubmissionsController {
     @Param('id') id: string,
   ) {
     return this.service.remove(this.service.appointments, tenantId || headerTenantId, id)
+  }
+
+  // ─── Newsletter ───────────────────────────────────────────────────────────
+
+  @Public()
+  @Throttle({ default: { limit: 20, ttl: 60_000 } })
+  @Post('newsletter')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Subscribe an email to the newsletter (public)' })
+  subscribeNewsletter(
+    @Headers('x-tenant-id') headerTenantId: string,
+    @CurrentUser('tenantId') tenantId: string,
+    @Body() dto: { email?: string; source?: string },
+  ) {
+    return this.service.subscribeNewsletter(tenantId || headerTenantId, dto)
+  }
+
+  @Get('newsletter')
+  @Roles('admin', 'manager', 'staff')
+  @ApiBearerAuth()
+  listNewsletter(
+    @CurrentUser('tenantId') tenantId: string,
+    @Headers('x-tenant-id') headerTenantId: string,
+    @Query('status') status?: string,
+  ) {
+    return this.service.listNewsletter(tenantId || headerTenantId, status)
   }
 
   // ─── Contact Submissions ─────────────────────────────────────────────────
