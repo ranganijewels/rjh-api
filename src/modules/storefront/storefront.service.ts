@@ -531,6 +531,11 @@ export class StorefrontService {
         /* default timeline */
       }
     }
+    // Kept on each line so the confirmation email can be rebuilt from the order
+    // later (online orders are confirmed by email only after payment).
+    for (const l of lineItems as Array<Record<string, any>>) {
+      if (productionTimes[l.productId]) l.dispatch = productionTimes[l.productId]
+    }
 
     const order = this.orderRepo.create({
       tenantId,
@@ -581,31 +586,16 @@ export class StorefrontService {
       await this.couponsService.incrementUse(tenantId, cart.coupon.code).catch(() => undefined)
     }
 
-    // Fire-and-forget order confirmation email (no-op / console-log in dev
-    // until SMTP env vars are set; never blocks or fails checkout).
-    this.emailService
-      .sendOrderConfirmation(customer.email || '', saved.orderNumber, customer.customerName, {
-        total: totalAmount,
-        paymentMethod: dto.paymentMethod || 'COD',
-        productName: firstItem.productName,
-        shippingAddress: addressText,
-        lines: lineItems.map((l) => ({
-          name: l.productName,
-          quantity: l.quantity,
-          specs: [
-            l.metalPurity && `${l.metalPurity} ${l.metalColor || ''}`.trim(),
-            l.diamondShape,
-            l.centerDiamondWeight && `${l.centerDiamondWeight} ct`,
-            l.diamondColor && `Color ${l.diamondColor}`,
-            l.diamondClarity && `Clarity ${l.diamondClarity}`,
-            l.ringSize && `Size ${l.ringSize}`,
-            l.backType && `${l.backType}`,
-            l.engraving && `Engraving “${l.engraving}”`,
-          ].filter(Boolean) as string[],
-          dispatch: productionTimes[l.productId] || '5–6 business days',
-        })),
-      })
-      .catch(() => undefined)
+    // Cash-on-delivery orders are confirmed now. Online orders are confirmed
+    // by email only once Cashfree reports the payment (payments controller),
+    // so a customer who abandons or fails payment is never told it went through.
+    if (!isOnline) {
+      this.emailService.sendOrderConfirmationForOrder(saved).catch(() => undefined)
+    }
+
+    // Tells the storefront which Cashfree checkout (sandbox or production) to
+    // open, so it always matches the keys the API used for this session.
+    if (isOnline) Object.assign(saved, { paymentMode: this.cashfreeService.mode })
 
     return saved
   }

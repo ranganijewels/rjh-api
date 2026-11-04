@@ -33,9 +33,14 @@ export class CashfreeService {
     return this.configService.get<string>('CASHFREE_SECRET_KEY') || ''
   }
 
-  private get baseUrl(): string {
+  /** 'production' or 'sandbox'. The storefront's checkout must use the same mode. */
+  get mode(): 'production' | 'sandbox' {
     const env = (this.configService.get<string>('CASHFREE_ENV') || 'sandbox').toLowerCase()
-    return env === 'production' ? 'https://api.cashfree.com/pg' : 'https://sandbox.cashfree.com/pg'
+    return env === 'production' ? 'production' : 'sandbox'
+  }
+
+  private get baseUrl(): string {
+    return this.mode === 'production' ? 'https://api.cashfree.com/pg' : 'https://sandbox.cashfree.com/pg'
   }
 
   isConfigured(): boolean {
