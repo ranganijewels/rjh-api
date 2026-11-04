@@ -134,6 +134,45 @@ export class EmailService {
   }
 
   /**
+   * The order confirmation, built from a saved order and its stored line items.
+   * Sent for cash-on-delivery orders at checkout, and for online orders only
+   * once the payment is confirmed (never before the money is in).
+   */
+  async sendOrderConfirmationForOrder(order: {
+    orderNumber: string
+    customerEmail?: string | null
+    customerName?: string | null
+    customerAddress?: string | null
+    totalAmount?: number | string | null
+    paymentMethod?: string | null
+    productName?: string | null
+    lineItems?: Array<Record<string, any>> | null
+  }): Promise<void> {
+    const lines = (order.lineItems || []).map((l) => ({
+      name: l.productName,
+      quantity: Number(l.quantity) || 1,
+      specs: [
+        l.metalPurity && `${l.metalPurity} ${l.metalColor || ''}`.trim(),
+        l.diamondShape,
+        l.centerDiamondWeight && `${l.centerDiamondWeight} ct`,
+        l.diamondColor && `Color ${l.diamondColor}`,
+        l.diamondClarity && `Clarity ${l.diamondClarity}`,
+        l.ringSize && `Size ${l.ringSize}`,
+        l.backType && `${l.backType}`,
+        l.engraving && `Engraving “${l.engraving}”`,
+      ].filter(Boolean) as string[],
+      dispatch: l.dispatch || '5–6 business days',
+    }))
+    await this.sendOrderConfirmation(order.customerEmail || '', order.orderNumber, order.customerName || '', {
+      total: order.totalAmount != null ? Number(order.totalAmount) : undefined,
+      paymentMethod: order.paymentMethod || undefined,
+      productName: order.productName || undefined,
+      shippingAddress: order.customerAddress || undefined,
+      lines,
+    })
+  }
+
+  /**
    * Send a welcome email to a newly registered user.
    */
   async sendWelcome(to: string, name: string): Promise<void> {

@@ -12,7 +12,7 @@ import {
   NotFoundException,
 } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
-import { Repository } from 'typeorm'
+import { Not, Repository } from 'typeorm'
 import { Request, Response } from 'express'
 import { ApiTags, ApiOperation } from '@nestjs/swagger'
 import { Order } from '../../database/entities/order.entity'
@@ -21,6 +21,7 @@ import { Public } from '../../common/decorators/public.decorator'
 import { CurrentUser } from '../../common/decorators/current-user.decorator'
 import { CashfreeService } from './services/cashfree.service'
 import { CartAccessGuard } from '../../common/guards/cart-access.guard'
+import { EmailService } from '../../infrastructure/email/email.service'
 
 @ApiTags('Payments')
 @Controller('payments/cashfree')
@@ -32,7 +33,41 @@ export class PaymentsController {
     private readonly orderRepo: Repository<Order>,
     private readonly cashfree: CashfreeService,
     private readonly marketing: MarketingService,
+    private readonly email: EmailService,
   ) {}
+
+  /**
+   * Records a payment result from either the webhook or the status re-check.
+   * A paid order is never moved back (Cashfree also reports earlier failed
+   * attempts, which can arrive after the success). The switch to Paid is a
+   * single conditional update, so when the webhook and the status check race,
+   * only one of them confirms the order and sends the email and Purchase event.
+   */
+  private async applyPaymentResult(order: Order, result: 'PAID' | 'FAILED', cfPaymentId?: string) {
+    if (order.paymentStatus === 'Paid') return
+    if (result === 'PAID') {
+      const { affected } = await this.orderRepo.update(
+        { id: order.id, paymentStatus: Not('Paid') },
+        {
+          paymentStatus: 'Paid',
+          orderStatus: order.orderStatus === 'Pending' ? 'Confirmed' : order.orderStatus,
+          cfPaymentId: cfPaymentId || order.cfPaymentId,
+        },
+      )
+      if (!affected) return // the other path confirmed it first
+      Object.assign(order, { paymentStatus: 'Paid', orderStatus: order.orderStatus === 'Pending' ? 'Confirmed' : order.orderStatus })
+      void this.marketing.sendPurchase(order.id)
+      this.email.sendOrderConfirmationForOrder(order).catch(() => undefined)
+      return
+    }
+    // FAILED / USER_DROPPED / EXPIRED: leave orderStatus alone so the order
+    // stays visible to staff and the customer can try again.
+    await this.orderRepo.update(
+      { id: order.id, paymentStatus: Not('Paid') },
+      { paymentStatus: 'Failed', cfPaymentId: cfPaymentId || order.cfPaymentId },
+    )
+    order.paymentStatus = 'Failed'
+  }
 
   // Cashfree calls this directly — no auth, verified by HMAC signature
   // instead. Must stay ahead of any other Order mutation as the single
@@ -70,17 +105,10 @@ export class PaymentsController {
     }
 
     if (paymentStatus === 'SUCCESS') {
-      order.paymentStatus = 'Paid'
-      order.orderStatus = order.orderStatus === 'Pending' ? 'Confirmed' : order.orderStatus
-      order.cfPaymentId = cfPaymentId || order.cfPaymentId
+      await this.applyPaymentResult(order, 'PAID', cfPaymentId)
     } else if (paymentStatus) {
-      // FAILED / USER_DROPPED / etc. — leave orderStatus alone so the
-      // customer can retry payment on the same order instead of losing it.
-      order.paymentStatus = 'Failed'
-      order.cfPaymentId = cfPaymentId || order.cfPaymentId
+      await this.applyPaymentResult(order, 'FAILED', cfPaymentId)
     }
-    await this.orderRepo.save(order)
-    if (order.paymentStatus === 'Paid') void this.marketing.sendPurchase(order.id)
 
     return res.status(200).json({ success: true })
   }
@@ -111,17 +139,15 @@ export class PaymentsController {
       throw new NotFoundException('Order not found')
     }
 
-    if (order.paymentStatus === 'Pending' && order.paymentGateway === 'cashfree') {
+    // Re-check anything not yet paid: a "Failed" order can still be paid by a
+    // later attempt on the same Cashfree order, before its webhook lands.
+    if (order.paymentStatus !== 'Paid' && order.paymentGateway === 'cashfree') {
       try {
         const { orderStatus } = await this.cashfree.getOrderStatus(order.orderNumber)
         if (orderStatus === 'PAID') {
-          order.paymentStatus = 'Paid'
-          order.orderStatus = order.orderStatus === 'Pending' ? 'Confirmed' : order.orderStatus
-          await this.orderRepo.save(order)
-          void this.marketing.sendPurchase(order.id)
+          await this.applyPaymentResult(order, 'PAID')
         } else if (orderStatus === 'EXPIRED' || orderStatus === 'TERMINATED') {
-          order.paymentStatus = 'Failed'
-          await this.orderRepo.save(order)
+          await this.applyPaymentResult(order, 'FAILED')
         }
       } catch {
         // Cashfree unreachable — fall through and return our last-known status
