@@ -21,6 +21,7 @@ import { CashfreeService } from '../payments/services/cashfree.service'
 import { CurrencyService } from '../currency/currency.service'
 import { ConfigService } from '@nestjs/config'
 import { createHash } from 'crypto'
+import { resolveCartItemName } from '../../common/utils/resolve-tokens.util'
 
 interface CartItem {
   // One line per product CONFIGURATION (metal, stone, size, engraving…), so
@@ -193,7 +194,9 @@ export class StorefrontService {
     if (existing) {
       existing.quantity += quantity
     } else {
-      cart.items.push({ ...item, quantity, lineId })
+      // Store the real name ("14K White Gold Vintage Pendant"), not the
+      // product's {{token}} template.
+      cart.items.push({ ...item, productName: resolveCartItemName(item.productName, item.metadata), quantity, lineId })
     }
     await this.saveCart(customerId, cart)
     return cart
@@ -354,6 +357,9 @@ export class StorefrontService {
     if (!cart.items.length) {
       throw new BadRequestException('Cart is empty')
     }
+    // Lines added before names were resolved may still hold the {{token}}
+    // template; the order, emails and "My orders" must show the real name.
+    for (const i of cart.items) i.productName = resolveCartItemName(i.productName, i.metadata)
 
     let customer: Customer | null = null
 
