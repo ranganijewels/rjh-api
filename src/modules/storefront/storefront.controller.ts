@@ -123,6 +123,13 @@ export class StorefrontController {
     return this.storefrontService.removeFromCart(customerId, lineId)
   }
 
+  @Get('payment-options')
+  @Public()
+  @ApiOperation({ summary: 'Online payment mode, and the fixed charge currency and rate if one is set' })
+  paymentOptions(@Headers('x-tenant-id') tenantId: string) {
+    return this.storefrontService.paymentOptions(tenantId)
+  }
+
   @Post('cart/checkout')
   @Public()
   @UseGuards(CartAccessGuard)
