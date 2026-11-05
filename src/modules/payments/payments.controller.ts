@@ -10,7 +10,10 @@ import {
   UseGuards,
   Logger,
   NotFoundException,
+  BadRequestException,
+  ForbiddenException,
 } from '@nestjs/common'
+import { ConfigService } from '@nestjs/config'
 import { InjectRepository } from '@nestjs/typeorm'
 import { Not, Repository } from 'typeorm'
 import { Request, Response } from 'express'
@@ -23,6 +26,13 @@ import { CashfreeService } from './services/cashfree.service'
 import { CartAccessGuard } from '../../common/guards/cart-access.guard'
 import { EmailService } from '../../infrastructure/email/email.service'
 
+/**
+ * Cashfree order ids: the shop order number, or "<orderNumber>-R<id>" for a
+ * pay-again attempt (Cashfree won't reuse an expired order id). Both map back
+ * to the same shop order.
+ */
+export const baseOrderNumber = (cfOrderId: string) => String(cfOrderId || '').replace(/-R[0-9a-z]+$/i, '')
+
 @ApiTags('Payments')
 @Controller('payments/cashfree')
 export class PaymentsController {
@@ -34,6 +44,7 @@ export class PaymentsController {
     private readonly cashfree: CashfreeService,
     private readonly marketing: MarketingService,
     private readonly email: EmailService,
+    private readonly config: ConfigService,
   ) {}
 
   /**
@@ -98,7 +109,7 @@ export class PaymentsController {
       return res.status(200).json({ success: true }) // ack — nothing to do
     }
 
-    const order = await this.orderRepo.findOne({ where: { orderNumber: orderId } })
+    const order = await this.orderRepo.findOne({ where: { orderNumber: baseOrderNumber(orderId) } })
     if (!order) {
       this.logger.warn(`Cashfree webhook for unknown order ${orderId}`)
       return res.status(200).json({ success: true }) // ack — avoid Cashfree retry storms
@@ -129,6 +140,10 @@ export class PaymentsController {
     @Param('orderNumber') orderNumber: string,
     @Query('email') email?: string,
   ) {
+    // The payment page may return a pay-again id (SF-…-R…): find the shop
+    // order by its number, but ask Cashfree about the attempt that was paid.
+    const cfOrderId = orderNumber
+    orderNumber = baseOrderNumber(orderNumber)
     const order = isGuest
       ? await this.orderRepo.findOne({ where: { orderNumber } })
       : await this.orderRepo.findOne({ where: { orderNumber, customerId } })
@@ -143,7 +158,7 @@ export class PaymentsController {
     // later attempt on the same Cashfree order, before its webhook lands.
     if (order.paymentStatus !== 'Paid' && order.paymentGateway === 'cashfree') {
       try {
-        const { orderStatus } = await this.cashfree.getOrderStatus(order.orderNumber)
+        const { orderStatus } = await this.cashfree.getOrderStatus(cfOrderId)
         if (orderStatus === 'PAID') {
           await this.applyPaymentResult(order, 'PAID')
         } else if (orderStatus === 'EXPIRED' || orderStatus === 'TERMINATED') {
@@ -160,5 +175,68 @@ export class PaymentsController {
       paymentStatus: order.paymentStatus,
       totalAmount: order.totalAmount,
     }
+  }
+
+  /**
+   * Pay again for an unpaid online order (account ▸ Orders). Signed-in
+   * customers only, and only their own order. Reuses the Cashfree order while
+   * it's still open; once it has expired, opens a new Cashfree order
+   * ("<orderNumber>-R<id>") for the same amount and currency.
+   */
+  @Post('retry/:orderNumber')
+  @Public()
+  @UseGuards(CartAccessGuard)
+  @ApiOperation({ summary: 'Start a new payment for an unpaid online order (customer)' })
+  async retry(
+    @CurrentUser('id') customerId: string,
+    @CurrentUser('isGuest') isGuest: boolean,
+    @Param('orderNumber') orderNumber: string,
+  ) {
+    if (isGuest || !customerId) throw new ForbiddenException('Sign in to pay for this order')
+    const order = await this.orderRepo.findOne({ where: { orderNumber: baseOrderNumber(orderNumber), customerId } })
+    if (!order) throw new NotFoundException('Order not found')
+    if (order.paymentStatus === 'Paid') return { alreadyPaid: true }
+    if (String(order.paymentMethod || '').toUpperCase() !== 'ONLINE') {
+      throw new BadRequestException('This order is paid on delivery')
+    }
+    if (/cancel/i.test(order.orderStatus || '')) throw new BadRequestException('This order was cancelled')
+
+    // 1. The original Cashfree order may still be open (or was paid and the
+    //    notice never arrived).
+    try {
+      const { orderStatus, raw } = await this.cashfree.getOrderStatus(order.orderNumber)
+      if (orderStatus === 'PAID') {
+        await this.applyPaymentResult(order, 'PAID')
+        return { alreadyPaid: true }
+      }
+      if (orderStatus === 'ACTIVE' && raw?.payment_session_id) {
+        return { paymentSessionId: raw.payment_session_id, paymentMode: this.cashfree.mode, cfOrderId: order.orderNumber }
+      }
+    } catch {
+      // Unknown or unreachable: fall through to a fresh Cashfree order.
+    }
+
+    // 2. A new Cashfree order for the same shop order, amount and currency.
+    const storefrontUrl = this.config.get<string>('STOREFRONT_URL') || 'http://localhost:3000'
+    const apiUrl = this.config.get<string>('API_PUBLIC_URL') || 'http://localhost:4000'
+    const cfOrderId = `${order.orderNumber}-R${Date.now().toString(36)}`
+    const result = await this.cashfree.createOrder({
+      orderId: cfOrderId,
+      orderAmount: Number(order.chargedAmount ?? order.totalAmount) || 0,
+      currency: order.currencyCode || 'USD',
+      customer: {
+        customerId: order.customerId,
+        customerName: order.customerName,
+        customerEmail: order.customerEmail || '',
+        customerPhone: order.customerPhone || '',
+      },
+      returnUrl: `${storefrontUrl}/cart/payment-status?order_id={order_id}`,
+      notifyUrl: `${apiUrl}/api/v1/payments/cashfree/webhook`,
+    })
+    await this.orderRepo.update(
+      { id: order.id, paymentStatus: Not('Paid') },
+      { cfPaymentSessionId: result.paymentSessionId, paymentStatus: 'Pending' },
+    )
+    return { paymentSessionId: result.paymentSessionId, paymentMode: this.cashfree.mode, cfOrderId }
   }
 }
